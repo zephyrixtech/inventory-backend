@@ -28,8 +28,17 @@ export default async function handler(
   req: IncomingMessage,
   res: ServerResponse<IncomingMessage>
 ) {
-  const app = await getApp();
-  return app(req, res);
+  try {
+    const app = await getApp();
+    return app(req, res);
+  } catch (error) {
+    logger.error({ error }, 'Unhandled error in request handler');
+    if (!res.headersSent) {
+      res.statusCode = 500;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ success: false, message: 'Internal Server Error' }));
+    }
+  }
 }
 
 if (require.main === module) {
@@ -44,3 +53,5 @@ if (require.main === module) {
     process.exit(1);
   });
 }
+
+module.exports = handler;
