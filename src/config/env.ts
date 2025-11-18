@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const env = process.env.NODE_ENV || 'development';
+const env = process.env.NODE_ENV || process.env.VERCEL_ENV || 'development';
 
 const requiredVariables = ['MONGODB_URI', 'JWT_SECRET', 'REFRESH_TOKEN_SECRET'];
 
