@@ -1,16 +1,46 @@
+import type { Express } from 'express';
+import type { IncomingMessage, RequestListener, ServerResponse } from 'http';
 import { config } from './config/env';
 import { connectDatabase } from './config/database';
 import { createApp } from './app';
 import { logger } from './utils/logger';
 
-const bootstrap = async () => {
-  await connectDatabase();
+type ExpressRequestListener = Express & RequestListener;
 
-  const app = createApp();
+let appPromise: Promise<ExpressRequestListener> | null = null;
 
-  app.listen(config.port, () => {
-    logger.info(`Server listening on port ${config.port}`);
-  });
+const getApp = async (): Promise<ExpressRequestListener> => {
+  if (!appPromise) {
+    appPromise = (async () => {
+      await connectDatabase();
+      return createApp() as ExpressRequestListener;
+    })().catch((error) => {
+      appPromise = null;
+      logger.error({ error }, 'Failed to initialize application');
+      throw error;
+    });
+  }
+
+  return appPromise;
 };
 
-void bootstrap();
+export default async function handler(
+  req: IncomingMessage,
+  res: ServerResponse<IncomingMessage>
+) {
+  const app = await getApp();
+  return app(req, res);
+}
+
+if (require.main === module) {
+  (async () => {
+    const app = await getApp();
+
+    app.listen(config.port, () => {
+      logger.info(`Server listening on port ${config.port}`);
+    });
+  })().catch((error) => {
+    logger.error({ error }, 'Failed to start server');
+    process.exit(1);
+  });
+}
