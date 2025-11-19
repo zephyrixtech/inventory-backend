@@ -24,6 +24,10 @@ export interface ItemDocument extends Document<Types.ObjectId> {
   qcCheckedBy?: Types.ObjectId;
   storeApprovedAt?: Date;
   storeApprovedBy?: Types.ObjectId;
+  additionalAttributes?: Record<string, unknown>;
+  videoType?: 'upload' | 'youtube';
+  youtubeLink?: string | null;
+  videoUrl?: string | null;
   isActive: boolean;
   createdBy?: Types.ObjectId;
   createdAt: Date;
@@ -57,6 +61,10 @@ const itemSchema = new Schema<ItemDocument>(
     qcCheckedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     storeApprovedAt: { type: Date },
     storeApprovedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    additionalAttributes: { type: Schema.Types.Mixed, default: {} },
+    videoType: { type: String, enum: ['upload', 'youtube'], default: 'upload' },
+    youtubeLink: { type: String, trim: true },
+    videoUrl: { type: String, trim: true },
     isActive: { type: Boolean, default: true },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
   },

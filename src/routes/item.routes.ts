@@ -11,7 +11,7 @@ router.use(authenticate, authorize(['manage_catalog']));
 
 router.get('/', listItems);
 
-router.get('/:id', [param('id').isMongoId()], validateRequest, getItem);
+router.get('/:id', [param('id').isMongoId().withMessage('Invalid item ID')], validateRequest, getItem);
 
 router.post(
   '/',
@@ -20,7 +20,10 @@ router.post(
     body('code').notEmpty(),
     body('categoryId').isMongoId(),
     body('reorderLevel').optional().isInt({ min: 0 }),
-    body('maxLevel').optional().isInt({ min: 0 })
+    body('maxLevel').optional().isInt({ min: 0 }),
+    body('videoType').optional().isIn(['upload', 'youtube']),
+    body('youtubeLink').optional({ nullable: true }).isString().withMessage('YouTube link must be a string'),
+    body('additionalAttributes').optional().isObject()
   ],
   validateRequest,
   createItem
@@ -29,16 +32,19 @@ router.post(
 router.put(
   '/:id',
   [
-    param('id').isMongoId(),
-    body('categoryId').optional().isMongoId(),
-    body('reorderLevel').optional().isInt({ min: 0 }),
-    body('maxLevel').optional().isInt({ min: 0 })
+    param('id').isMongoId().withMessage('Invalid item ID'),
+    body('categoryId').optional().isMongoId().withMessage('Invalid category ID'),
+    body('reorderLevel').optional().isInt({ min: 0 }).withMessage('Reorder level must be a non-negative integer'),
+    body('maxLevel').optional().isInt({ min: 0 }).withMessage('Max level must be a non-negative integer'),
+    body('videoType').optional().isIn(['upload', 'youtube']),
+    body('youtubeLink').optional({ nullable: true }).isString().withMessage('YouTube link must be a string'),
+    body('additionalAttributes').optional().isObject()
   ],
   validateRequest,
   updateItem
 );
 
-router.delete('/:id', [param('id').isMongoId()], validateRequest, deleteItem);
+router.delete('/:id', [param('id').isMongoId().withMessage('Invalid item ID')], validateRequest, deleteItem);
 
 export default router;
 

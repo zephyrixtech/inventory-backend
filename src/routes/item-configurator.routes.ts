@@ -19,7 +19,7 @@ router.use(authenticate, authorize(['manage_catalog']));
 router.get('/', listItemConfigurations);
 
 router.get('/:id', [
-  param('id').isMongoId()
+  param('id').isMongoId().withMessage('Invalid item configuration ID')
 ], validateRequest, getItemConfiguration);
 
 router.post(

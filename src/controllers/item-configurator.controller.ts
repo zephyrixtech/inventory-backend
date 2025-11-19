@@ -52,8 +52,13 @@ export const getItemConfiguration = asyncHandler(async (req: Request, res: Respo
     throw ApiError.badRequest('Company context missing');
   }
 
+  const itemConfigId = req.params.id;
+  if (!Types.ObjectId.isValid(itemConfigId)) {
+    throw ApiError.badRequest('Invalid item configuration ID format');
+  }
+
   const itemConfig = await ItemConfigurator.findOne({ 
-    _id: req.params.id, 
+    _id: new Types.ObjectId(itemConfigId), 
     company: companyId,
     isActive: true 
   });
@@ -195,8 +200,13 @@ export const updateItemConfiguration = asyncHandler(async (req: Request, res: Re
     throw ApiError.badRequest('Company context missing');
   }
 
+  const itemConfigId = req.params.id;
+  if (!Types.ObjectId.isValid(itemConfigId)) {
+    throw ApiError.badRequest('Invalid item configuration ID format');
+  }
+
   const itemConfig = await ItemConfigurator.findOne({ 
-    _id: req.params.id, 
+    _id: new Types.ObjectId(itemConfigId), 
     company: companyId,
     isActive: true 
   });
@@ -280,8 +290,13 @@ export const deleteItemConfiguration = asyncHandler(async (req: Request, res: Re
     throw ApiError.badRequest('Company context missing');
   }
 
+  const itemConfigId = req.params.id;
+  if (!Types.ObjectId.isValid(itemConfigId)) {
+    throw ApiError.badRequest('Invalid item configuration ID format');
+  }
+
   const itemConfig = await ItemConfigurator.findOne({ 
-    _id: req.params.id, 
+    _id: new Types.ObjectId(itemConfigId), 
     company: companyId 
   });
 

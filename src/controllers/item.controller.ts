@@ -12,6 +12,9 @@ import { respond } from '../utils/api-response';
 import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 export const listItems = asyncHandler(async (req: Request, res: Response) => {
   const companyId = req.companyId;
   if (!companyId) {
@@ -72,13 +75,28 @@ export const getItem = asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.badRequest('Company context missing');
   }
 
-  const item = await Item.findOne({ _id: req.params.id, company: companyId }).populate('category', 'name').populate('vendor', 'name contactPerson');
+  const itemId = req.params.id;
+  if (!Types.ObjectId.isValid(itemId)) {
+    throw ApiError.badRequest('Invalid item ID format');
+  }
+
+  const item = await Item.findOne({ _id: new Types.ObjectId(itemId), company: companyId })
+    .populate('category', 'name')
+    .populate('vendor', 'name contactPerson');
 
   if (!item) {
     throw ApiError.notFound('Item not found');
   }
 
-  return respond(res, StatusCodes.OK, item);
+  const itemData = item.toObject();
+  itemData.additionalAttributes = isPlainObject(itemData.additionalAttributes)
+    ? itemData.additionalAttributes
+    : {};
+  itemData.videoType = itemData.videoType || 'upload';
+  itemData.youtubeLink = typeof itemData.youtubeLink === 'string' ? itemData.youtubeLink : null;
+  itemData.videoUrl = typeof itemData.videoUrl === 'string' ? itemData.videoUrl : null;
+
+  return respond(res, StatusCodes.OK, itemData);
 });
 
 export const createItem = asyncHandler(async (req: Request, res: Response) => {
@@ -87,7 +105,25 @@ export const createItem = asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.badRequest('Company context missing');
   }
 
-  const { name, code, categoryId, description, reorderLevel, maxLevel, unitOfMeasure, vendorId, unitPrice, currency, quantity, purchaseDate, status } = req.body;
+  const {
+    name,
+    code,
+    categoryId,
+    description,
+    reorderLevel,
+    maxLevel,
+    unitOfMeasure,
+    vendorId,
+    unitPrice,
+    currency,
+    quantity,
+    purchaseDate,
+    status,
+    additionalAttributes,
+    videoType,
+    youtubeLink,
+    videoUrl
+  } = req.body;
 
   const existing = await Item.findOne({ company: companyId, code });
   if (existing) {
@@ -108,6 +144,15 @@ export const createItem = asyncHandler(async (req: Request, res: Response) => {
     vendorObjectId = vendor._id;
   }
 
+  const normalizedVideoType: 'upload' | 'youtube' = videoType === 'youtube' ? 'youtube' : 'upload';
+  const sanitizedYoutubeLink =
+    normalizedVideoType === 'youtube' && typeof youtubeLink === 'string' && youtubeLink.trim().length > 0
+      ? youtubeLink.trim()
+      : undefined;
+  const sanitizedVideoUrl =
+    normalizedVideoType === 'upload' && typeof videoUrl === 'string' && videoUrl.trim().length > 0 ? videoUrl.trim() : undefined;
+  const sanitizedAdditionalAttributes = isPlainObject(additionalAttributes) ? additionalAttributes : undefined;
+
   const item = await Item.create({
     company: companyId,
     name,
@@ -122,7 +167,11 @@ export const createItem = asyncHandler(async (req: Request, res: Response) => {
     currency,
     quantity,
     purchaseDate,
-    status
+    status,
+    additionalAttributes: sanitizedAdditionalAttributes,
+    videoType: normalizedVideoType,
+    youtubeLink: sanitizedYoutubeLink,
+    videoUrl: sanitizedVideoUrl
   });
 
   return respond(res, StatusCodes.CREATED, await item.populate('vendor', 'name contactPerson'), {
@@ -136,13 +185,36 @@ export const updateItem = asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.badRequest('Company context missing');
   }
 
-  const item = await Item.findOne({ _id: req.params.id, company: companyId });
+  const itemId = req.params.id;
+  if (!Types.ObjectId.isValid(itemId)) {
+    throw ApiError.badRequest('Invalid item ID format');
+  }
+
+  const item = await Item.findOne({ _id: new Types.ObjectId(itemId), company: companyId });
 
   if (!item) {
     throw ApiError.notFound('Item not found');
   }
 
-  const { name, categoryId, description, reorderLevel, maxLevel, unitOfMeasure, isActive, vendorId, unitPrice, currency, quantity, purchaseDate, status } = req.body;
+  const {
+    name,
+    categoryId,
+    description,
+    reorderLevel,
+    maxLevel,
+    unitOfMeasure,
+    isActive,
+    vendorId,
+    unitPrice,
+    currency,
+    quantity,
+    purchaseDate,
+    status,
+    additionalAttributes,
+    videoType,
+    youtubeLink,
+    videoUrl
+  } = req.body;
 
   if (name) item.name = name;
   if (description) item.description = description;
@@ -170,6 +242,30 @@ export const updateItem = asyncHandler(async (req: Request, res: Response) => {
     item.vendor = vendor._id;
   }
 
+  if (isPlainObject(additionalAttributes)) {
+    item.additionalAttributes = additionalAttributes;
+  }
+
+  if (typeof videoType === 'string') {
+    item.videoType = videoType === 'youtube' ? 'youtube' : 'upload';
+  }
+
+  if (Object.prototype.hasOwnProperty.call(req.body, 'youtubeLink')) {
+    if (typeof youtubeLink === 'string' && youtubeLink.trim().length > 0) {
+      item.youtubeLink = youtubeLink.trim();
+    } else {
+      item.youtubeLink = null;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(req.body, 'videoUrl')) {
+    if (typeof videoUrl === 'string' && videoUrl.trim().length > 0) {
+      item.videoUrl = videoUrl.trim();
+    } else {
+      item.videoUrl = null;
+    }
+  }
+
   await item.save();
 
   return respond(res, StatusCodes.OK, await item.populate('vendor', 'name contactPerson'), {
@@ -183,7 +279,12 @@ export const deleteItem = asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.badRequest('Company context missing');
   }
 
-  const item = await Item.findOne({ _id: req.params.id, company: companyId });
+  const itemId = req.params.id;
+  if (!Types.ObjectId.isValid(itemId)) {
+    throw ApiError.badRequest('Invalid item ID format');
+  }
+
+  const item = await Item.findOne({ _id: new Types.ObjectId(itemId), company: companyId });
 
   if (!item) {
     throw ApiError.notFound('Item not found');
