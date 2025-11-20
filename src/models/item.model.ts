@@ -19,9 +19,13 @@ export interface ItemDocument extends Document<Types.ObjectId> {
   purchaseDate?: Date;
   status: ItemStatus;
   qcStatus?: 'pending' | 'approved' | 'rejected';
+  damagedQuantity?: number;
   qcRemarks?: string;
   qcCheckedAt?: Date;
   qcCheckedBy?: Types.ObjectId;
+  qcCheckedByName?: string;
+  qcSubmittedBy?: Types.ObjectId;
+  qcSubmittedByName?: string;
   storeApprovedAt?: Date;
   storeApprovedBy?: Types.ObjectId;
   additionalAttributes?: Record<string, unknown>;
@@ -56,9 +60,13 @@ const itemSchema = new Schema<ItemDocument>(
       default: 'draft'
     },
     qcStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+    damagedQuantity: { type: Number, min: 0 },
     qcRemarks: { type: String, trim: true },
     qcCheckedAt: { type: Date },
     qcCheckedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    qcCheckedByName: { type: String, trim: true },
+    qcSubmittedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    qcSubmittedByName: { type: String, trim: true },
     storeApprovedAt: { type: Date },
     storeApprovedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     additionalAttributes: { type: Schema.Types.Mixed, default: {} },

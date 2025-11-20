@@ -6,6 +6,7 @@ import { Item } from '../models/item.model';
 import { Category } from '../models/category.model';
 import { Vendor } from '../models/vendor.model';
 import { StoreStock } from '../models/store-stock.model';
+import { Supplier } from '../models/supplier.model';
 import { ApiError } from '../utils/api-error';
 import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
@@ -21,10 +22,22 @@ export const listItems = asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.badRequest('Company context missing');
   }
 
-  const { categoryId, search, status } = req.query;
+  const { categoryId, search, status, qcStatus, isActive } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
   const filters: Record<string, unknown> = { company: companyId };
+
+  if (typeof isActive === 'string') {
+    if (isActive === 'true') {
+      filters.isActive = true;
+    } else if (isActive === 'false') {
+      filters.isActive = false;
+    }
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(filters, 'isActive')) {
+    filters.isActive = true;
+  }
 
   if (categoryId && categoryId !== 'all') {
     filters.category = categoryId;
@@ -32,6 +45,11 @@ export const listItems = asyncHandler(async (req: Request, res: Response) => {
 
   if (status && status !== 'all') {
     filters.status = status;
+  }
+
+  const qcStatusValue = typeof qcStatus === 'string' ? qcStatus : undefined;
+  if (qcStatusValue && ['pending', 'approved', 'rejected'].includes(qcStatusValue)) {
+    filters.qcStatus = qcStatusValue;
   }
 
   if (search && typeof search === 'string') {
@@ -54,6 +72,34 @@ export const listItems = asyncHandler(async (req: Request, res: Response) => {
 
   const [items, total] = await Promise.all([query.exec(), Item.countDocuments(filters)]);
 
+  const itemsMissingVendor = items.filter((item) => !item.vendor).map((item) => item._id.toString());
+  const supplierFallbackMap = new Map<
+    string,
+    {
+      _id: Types.ObjectId;
+      name: string;
+      contactPerson?: string;
+    }
+  >();
+
+  if (itemsMissingVendor.length > 0) {
+    const suppliers = await Supplier.find({
+      company: companyId,
+      selectedSupplies: { $in: itemsMissingVendor }
+    })
+      .select(['name', 'contactPerson', 'selectedSupplies']);
+
+    suppliers.forEach((supplier) => {
+      supplier.selectedSupplies?.forEach((productId) => {
+        supplierFallbackMap.set(productId.toString(), {
+          _id: supplier._id,
+          name: supplier.name,
+          contactPerson: supplier.contactPerson
+        });
+      });
+    });
+  }
+
   const itemIds = items.map((item) => item._id);
   const stockRecords = await StoreStock.find({ company: companyId, product: { $in: itemIds } });
   const stockMap = new Map<string, number>();
@@ -61,10 +107,20 @@ export const listItems = asyncHandler(async (req: Request, res: Response) => {
     stockMap.set(record.product.toString(), record.quantity);
   });
 
-  const payload = items.map((item) => ({
-    ...item.toObject(),
-    availableStock: stockMap.get(item._id.toString()) ?? item.quantity ?? 0
-  }));
+  const payload = items.map((item) => {
+    const serialized = item.toObject();
+    if (!serialized.vendor) {
+      const fallback = supplierFallbackMap.get(item._id.toString());
+      if (fallback) {
+        serialized.vendor = fallback as any;
+      }
+    }
+
+    return {
+      ...serialized,
+      availableStock: stockMap.get(item._id.toString()) ?? item.quantity ?? 0
+    };
+  });
 
   return respond(res, StatusCodes.OK, payload, buildPaginationMeta(page, limit, total));
 });

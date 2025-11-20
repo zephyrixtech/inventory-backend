@@ -6,6 +6,10 @@ export interface QualityCheckDocument extends Document<Types.ObjectId> {
   status: 'pending' | 'approved' | 'rejected';
   remarks?: string;
   checkedBy: Types.ObjectId;
+  checkedByName?: string;
+  submittedBy?: Types.ObjectId;
+  submittedByName?: string;
+  damagedQuantity?: number;
   checkedAt: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -18,6 +22,10 @@ const qualityCheckSchema = new Schema<QualityCheckDocument>(
     status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
     remarks: { type: String, trim: true },
     checkedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    checkedByName: { type: String, trim: true },
+    submittedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    submittedByName: { type: String, trim: true },
+    damagedQuantity: { type: Number, min: 0 },
     checkedAt: { type: Date, default: Date.now }
   },
   {

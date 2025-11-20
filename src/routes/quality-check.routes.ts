@@ -11,7 +11,11 @@ router.use(authenticate, authorize(['manage_qc']));
 
 router.post(
   '/',
-  [body('productId').isMongoId(), body('status').isIn(['approved', 'rejected', 'pending'])],
+  [
+    body('productId').isMongoId(),
+    body('status').isIn(['approved', 'rejected', 'pending']),
+    body('damagedQuantity').optional().isFloat({ min: 0 })
+  ],
   validateRequest,
   submitQualityCheck
 );
