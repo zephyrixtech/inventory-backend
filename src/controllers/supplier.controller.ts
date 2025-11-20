@@ -99,7 +99,8 @@ export const createSupplier = asyncHandler(async (req: Request, res: Response) =
     rating,
     notes,
     selectedBrands,
-    selectedSupplies
+    selectedSupplies,
+    selectedSubcategories
   } = req.body;
 
   const existing = await Supplier.findOne({ company: companyId, supplierId });
@@ -135,9 +136,11 @@ export const createSupplier = asyncHandler(async (req: Request, res: Response) =
     notes,
     selectedBrands,
     selectedSupplies,
+    selectedSubcategories,
     createdBy: req.user?.id
   });
-
+ console.log(supplier,"supplier^^^^^^^^^^^^^");
+ 
   return respond(res, StatusCodes.CREATED, supplier, { message: 'Supplier created successfully' });
 });
 
@@ -179,7 +182,8 @@ export const updateSupplier = asyncHandler(async (req: Request, res: Response) =
     rating,
     notes,
     selectedBrands,
-    selectedSupplies
+    selectedSupplies,
+    selectedSubcategories
   } = req.body;
 
   if (name !== undefined) supplier.name = name;
@@ -208,6 +212,7 @@ export const updateSupplier = asyncHandler(async (req: Request, res: Response) =
   if (notes !== undefined) supplier.notes = notes;
   if (selectedBrands !== undefined) supplier.selectedBrands = selectedBrands;
   if (selectedSupplies !== undefined) supplier.selectedSupplies = selectedSupplies;
+  if (selectedSubcategories !== undefined) supplier.selectedSubcategories = selectedSubcategories;
 
   await supplier.save();
 

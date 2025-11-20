@@ -31,6 +31,10 @@ export interface SupplierDocument extends Document<Types.ObjectId> {
   notes?: string;
   selectedBrands?: string[];
   selectedSupplies?: string[];
+  selectedSubcategories?: Array<{
+    categoryId: string;
+    subcategoryId: string;
+  }>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -66,7 +70,11 @@ const supplierSchema = new Schema<SupplierDocument>(
     rating: { type: Number },
     notes: { type: String, trim: true },
     selectedBrands: [{ type: String }],
-    selectedSupplies: [{ type: String }]
+    selectedSupplies: [{ type: String }],
+    selectedSubcategories: [{
+      categoryId: { type: String, required: true },
+      subcategoryId: { type: String, required: true }
+    }]
   },
   {
     timestamps: true
