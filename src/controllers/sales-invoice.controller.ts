@@ -37,15 +37,18 @@ const normalizeInvoiceItems = async (
       throw ApiError.badRequest(`Invalid item: ${entry.itemId}`);
     }
 
-    const discount = entry.discount ?? 0;
-    const totalPrice = entry.quantity * entry.unitPrice - discount;
+    // Convert discount percentage to actual discount amount
+    const discountPercentage = entry.discount ?? 0;
+    const grossAmount = entry.quantity * entry.unitPrice;
+    const discountAmount = (grossAmount * discountPercentage) / 100;
+    const totalPrice = grossAmount - discountAmount;
 
     normalized.push({
       item: item._id,
       description: entry.description ?? item.name,
       quantity: entry.quantity,
       unitPrice: entry.unitPrice,
-      discount,
+      discount: discountAmount, 
       totalPrice
     });
   }
