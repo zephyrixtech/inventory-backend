@@ -72,7 +72,7 @@ export const listItems = asyncHandler(async (req: Request, res: Response) => {
 
   const [items, total] = await Promise.all([query.exec(), Item.countDocuments(filters)]);
 
-  const itemsMissingVendor = items.filter((item) => !item.vendor).map((item) => item._id.toString());
+  const itemsMissingVendor = items.filter((item) => !item.vendor).map((item) => (item as any)._id.toString());
   const supplierFallbackMap = new Map<
     string,
     {
@@ -110,7 +110,7 @@ export const listItems = asyncHandler(async (req: Request, res: Response) => {
   const payload = items.map((item) => {
     const serialized = item.toObject();
     if (!serialized.vendor) {
-      const fallback = supplierFallbackMap.get(item._id.toString());
+      const fallback = supplierFallbackMap.get((item as any)._id.toString());
       if (fallback) {
         serialized.vendor = fallback as any;
       }
@@ -118,7 +118,7 @@ export const listItems = asyncHandler(async (req: Request, res: Response) => {
 
     return {
       ...serialized,
-      availableStock: stockMap.get(item._id.toString()) ?? item.quantity ?? 0
+      availableStock: stockMap.get((item as any)._id.toString()) ?? item.quantity ?? 0
     };
   });
 
@@ -215,13 +215,13 @@ export const createItem = asyncHandler(async (req: Request, res: Response) => {
     code,
     category: category._id,
     description,
-    reorderLevel,
-    maxLevel,
     unitOfMeasure,
     vendor: vendorObjectId,
     unitPrice,
     currency,
     quantity,
+    damagedQuantity: 0,
+    availableQuantity: quantity ?? 0,
     purchaseDate,
     status,
     additionalAttributes: sanitizedAdditionalAttributes,
@@ -256,8 +256,6 @@ export const updateItem = asyncHandler(async (req: Request, res: Response) => {
     name,
     categoryId,
     description,
-    reorderLevel,
-    maxLevel,
     unitOfMeasure,
     isActive,
     vendorId,
@@ -274,12 +272,14 @@ export const updateItem = asyncHandler(async (req: Request, res: Response) => {
 
   if (name) item.name = name;
   if (description) item.description = description;
-  if (typeof reorderLevel === 'number') item.reorderLevel = reorderLevel;
-  if (typeof maxLevel === 'number') item.maxLevel = maxLevel;
   if (unitOfMeasure) item.unitOfMeasure = unitOfMeasure;
   if (typeof isActive === 'boolean') item.isActive = isActive;
   if (typeof unitPrice === 'number') item.unitPrice = unitPrice;
-  if (typeof quantity === 'number') item.quantity = quantity;
+  if (typeof quantity === 'number') {
+    item.quantity = quantity;
+    const damaged = item.damagedQuantity || 0;
+    item.availableQuantity = Math.max(0, quantity - damaged);
+  }
   if (currency) item.currency = currency;
   if (purchaseDate) item.purchaseDate = purchaseDate;
   if (status) item.status = status;

@@ -31,6 +31,7 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
 
   const query = StoreStock.find(filters)
     .populate('product', 'name code currency unitPrice quantity status')
+    .populate('store', 'name code type')
     .populate('lastUpdatedBy', 'firstName lastName');
 
   if (sortBy) {
@@ -52,7 +53,7 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
     throw ApiError.badRequest('Company context missing');
   }
 
-  const { productId, quantity, margin, currency } = req.body;
+  const { productId, storeId, quantity, margin, currency } = req.body;
 
   const product = await Item.findOne({ _id: productId, company: companyId });
 
@@ -75,16 +76,18 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
   const priceAfterMargin = basePrice + (basePrice * marginPercentage) / 100;
 
   const stock = await StoreStock.findOneAndUpdate(
-    { company: companyId, product: product._id },
+    { company: companyId, product: product._id, store: storeId ? new Types.ObjectId(storeId) : null },
     {
       quantity,
       margin: marginPercentage,
       currency: currency ?? product.currency ?? 'INR',
       priceAfterMargin,
+      ...(storeId && { store: new Types.ObjectId(storeId) }),
       lastUpdatedBy: new Types.ObjectId(req.user.id)
     },
     { upsert: true, new: true, setDefaultsOnInsert: true }
-  ).populate('product', 'name code currency unitPrice quantity status');
+  ).populate('product', 'name code currency unitPrice quantity status')
+    .populate('store', 'name code type');
 
   return respond(res, StatusCodes.OK, stock, { message: 'Store stock updated successfully' });
 });

@@ -1,13 +1,13 @@
 import { Schema, model, type Document, type Types } from 'mongoose';
 
-export type ItemStatus = 
-  | 'draft' 
-  | 'pending_qc' 
-  | 'qc_passed' 
-  | 'qc_failed' 
-  | 'store_pending' 
-  | 'store_approved' 
-  | 'store_rejected' 
+export type ItemStatus =
+  | 'draft'
+  | 'pending_qc'
+  | 'qc_passed'
+  | 'qc_failed'
+  | 'store_pending'
+  | 'store_approved'
+  | 'store_rejected'
   | 'archived';
 
 export interface ItemDocument extends Document {
@@ -20,16 +20,16 @@ export interface ItemDocument extends Document {
   vendor?: Types.ObjectId;
   unitPrice?: number;
   currency?: 'INR' | 'AED';
-  
+
   // Quantity fields
   quantity?: number; // Total quantity
   damagedQuantity?: number; // Damaged quantity from QC
-  availableQuantity: number; // Virtual field: quantity - damagedQuantity
-  
+  availableQuantity?: number; // Stored field: quantity - damagedQuantity
+
   totalPrice?: number;
   purchaseDate?: Date;
   status: ItemStatus;
-  
+
   // QC fields
   qcStatus?: 'pending' | 'approved' | 'rejected';
   qcRemarks?: string;
@@ -38,11 +38,11 @@ export interface ItemDocument extends Document {
   qcCheckedByName?: string;
   qcSubmittedBy?: Types.ObjectId;
   qcSubmittedByName?: string;
-  
+
   // Store approval fields
   storeApprovedAt?: Date;
   storeApprovedBy?: Types.ObjectId;
-  
+
   // Additional fields
   additionalAttributes?: Record<string, any>;
   videoType?: 'upload' | 'youtube';
@@ -56,66 +56,70 @@ export interface ItemDocument extends Document {
 
 const itemSchema = new Schema<ItemDocument>(
   {
-    company: { 
-      type: Schema.Types.ObjectId, 
-      ref: 'Company', 
-      required: true, 
-      index: true 
+    company: {
+      type: Schema.Types.ObjectId,
+      ref: 'Company',
+      required: true,
+      index: true
     },
-    name: { 
-      type: String, 
-      required: true, 
-      trim: true 
+    name: {
+      type: String,
+      required: true,
+      trim: true
     },
-    code: { 
-      type: String, 
-      required: true, 
-      trim: true 
+    code: {
+      type: String,
+      required: true,
+      trim: true
     },
-    category: { 
-      type: Schema.Types.ObjectId, 
-      ref: 'Category', 
-      required: true 
+    category: {
+      type: Schema.Types.ObjectId,
+      ref: 'Category',
+      required: true
     },
-    description: { 
-      type: String, 
-      trim: true 
+    description: {
+      type: String,
+      trim: true
     },
-    unitOfMeasure: { 
-      type: String, 
-      trim: true 
+    unitOfMeasure: {
+      type: String,
+      trim: true
     },
-    vendor: { 
-      type: Schema.Types.ObjectId, 
-      ref: 'Vendor' 
+    vendor: {
+      type: Schema.Types.ObjectId,
+      ref: 'Vendor'
     },
-    unitPrice: { 
-      type: Number, 
-      min: 0 
+    unitPrice: {
+      type: Number,
+      min: 0
     },
-    currency: { 
-      type: String, 
-      enum: ['INR', 'AED'], 
-      default: 'INR' 
+    currency: {
+      type: String,
+      enum: ['INR', 'AED'],
+      default: 'INR'
     },
-    
+
     // NEW: Quantity fields (optional, keeping current logic)
-    quantity: { 
-      type: Number, 
-      min: 0 
+    quantity: {
+      type: Number,
+      min: 0
     },
-    damagedQuantity: { 
-      type: Number, 
+    damagedQuantity: {
+      type: Number,
       min: 0,
       default: 0
     },
-    
-    totalPrice: { 
-      type: Number, 
-      min: 0 
+    availableQuantity: {
+      type: Number,
+      default: 0
     },
-    purchaseDate: { 
-      type: Date 
+
+    totalPrice: {
+      type: Number,
+      min: 0
+    },
+    purchaseDate: {
+      type: Date
     },
     status: {
       type: String,
@@ -131,46 +135,46 @@ const itemSchema = new Schema<ItemDocument>(
       ],
       default: 'draft'
     },
-    
+
     // QC fields
     qcStatus: {
       type: String,
       enum: ['pending', 'approved', 'rejected'],
       default: 'pending'
     },
-    qcRemarks: { 
-      type: String, 
-      trim: true 
+    qcRemarks: {
+      type: String,
+      trim: true
     },
-    qcCheckedAt: { 
-      type: Date 
+    qcCheckedAt: {
+      type: Date
     },
-    qcCheckedBy: { 
-      type: Schema.Types.ObjectId, 
-      ref: 'User' 
+    qcCheckedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User'
     },
-    qcCheckedByName: { 
-      type: String, 
-      trim: true 
+    qcCheckedByName: {
+      type: String,
+      trim: true
     },
-    qcSubmittedBy: { 
-      type: Schema.Types.ObjectId, 
-      ref: 'User' 
+    qcSubmittedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User'
     },
-    qcSubmittedByName: { 
-      type: String, 
-      trim: true 
+    qcSubmittedByName: {
+      type: String,
+      trim: true
     },
-    
+
     // Store approval fields
-    storeApprovedAt: { 
-      type: Date 
+    storeApprovedAt: {
+      type: Date
     },
-    storeApprovedBy: { 
-      type: Schema.Types.ObjectId, 
-      ref: 'User' 
+    storeApprovedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User'
     },
-    
+
     // Additional fields
     additionalAttributes: {
       type: Schema.Types.Mixed,
@@ -181,24 +185,24 @@ const itemSchema = new Schema<ItemDocument>(
       enum: ['upload', 'youtube'],
       default: 'upload'
     },
-    youtubeLink: { 
-      type: String, 
-      trim: true 
+    youtubeLink: {
+      type: String,
+      trim: true
     },
-    videoUrl: { 
-      type: String, 
-      trim: true 
+    videoUrl: {
+      type: String,
+      trim: true
     },
-    isActive: { 
-      type: Boolean, 
-      default: true 
+    isActive: {
+      type: Boolean,
+      default: true
     },
-    createdBy: { 
-      type: Schema.Types.ObjectId, 
-      ref: 'User' 
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User'
     }
   },
-  { 
+  {
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
@@ -210,15 +214,8 @@ itemSchema.index({ company: 1, code: 1 }, { unique: true });
 itemSchema.index({ company: 1, name: 1 });
 itemSchema.index({ company: 1, status: 1 });
 
-// Virtual field for available quantity (quantity - damagedQuantity)
-itemSchema.virtual('availableQuantity').get(function(this: ItemDocument) {
-  const qty = this.quantity || 0;
-  const damaged = this.damagedQuantity || 0;
-  return Math.max(0, qty - damaged);
-});
-
 // Existing pre-save hook (keep as is)
-itemSchema.pre('save', function(next) {
+itemSchema.pre('save', function (next) {
   if (typeof this.quantity === 'number' && typeof this.unitPrice === 'number') {
     this.totalPrice = this.quantity * this.unitPrice;
   }

@@ -74,6 +74,9 @@ export const submitQualityCheck = asyncHandler(async (req: Request, res: Respons
   product.qcSubmittedBy = req.user.id as any;
   if (sanitizedDamagedQuantity !== undefined) {
     product.damagedQuantity = sanitizedDamagedQuantity;
+    // Update availableQuantity
+    const totalQty = product.quantity || 0;
+    product.availableQuantity = Math.max(0, totalQty - sanitizedDamagedQuantity);
   }
   product.status = status === 'approved' ? 'store_pending' : status === 'rejected' ? 'qc_failed' : 'pending_qc';
 
