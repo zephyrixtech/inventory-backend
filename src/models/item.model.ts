@@ -11,6 +11,7 @@ export type ItemStatus =
   | 'archived';
 
 export interface ItemDocument extends Document {
+  _id: Types.ObjectId;
   company: Types.ObjectId;
   name: string;
   code: string;
