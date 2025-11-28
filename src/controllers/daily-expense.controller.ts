@@ -55,7 +55,7 @@ export const createDailyExpense = asyncHandler(async (req: Request, res: Respons
     throw ApiError.badRequest('Company context missing');
   }
 
-  const { productId, description, amount, date } = req.body;
+  const { productId, description, amount, date, type } = req.body;
 
   const product = await Item.findOne({ _id: productId, company: companyId });
 
@@ -69,6 +69,7 @@ export const createDailyExpense = asyncHandler(async (req: Request, res: Respons
     description,
     amount,
     date,
+    type,
     createdBy: req.user.id
   });
 

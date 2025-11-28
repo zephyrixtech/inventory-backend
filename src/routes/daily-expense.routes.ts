@@ -13,7 +13,7 @@ router.get('/', listDailyExpenses);
 
 router.post(
   '/',
-  [body('productId').isMongoId(), body('description').notEmpty(), body('amount').isNumeric(), body('date').optional().isISO8601()],
+  [body('productId').isMongoId(), body('description').notEmpty(), body('amount').isNumeric(), body('date').optional().isISO8601(), body('type').isIn(['purchase', 'petty', 'sale'])],
   validateRequest,
   createDailyExpense
 );

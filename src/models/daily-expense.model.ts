@@ -6,6 +6,7 @@ export interface DailyExpenseDocument extends Document<Types.ObjectId> {
   description: string;
   amount: number;
   date: Date;
+  type: 'purchase' | 'petty' | 'sale';
   createdBy: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -18,6 +19,7 @@ const dailyExpenseSchema = new Schema<DailyExpenseDocument>(
     description: { type: String, required: true, trim: true },
     amount: { type: Number, required: true, min: 0 },
     date: { type: Date, default: Date.now },
+    type: { type: String, required: true, enum: ['purchase', 'petty', 'sale'] },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true }
   },
   {
