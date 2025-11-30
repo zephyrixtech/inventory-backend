@@ -62,7 +62,9 @@ export const listPackingLists = asyncHandler(async (req: Request, res: Response)
 
   const query = PackingList.find(filters)
     .populate('items.product', 'name code status')
-    .populate('createdBy', 'firstName lastName');
+    .populate('createdBy', 'firstName lastName')
+    .populate('store', 'name code')
+    .populate('toStore', 'name code');
 
   if (sortBy) {
     query.sort({ [sortBy]: sortOrder === 'asc' ? 1 : -1 });
@@ -83,7 +85,7 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
     throw ApiError.badRequest('Company context missing');
   }
 
-  const { location, boxNumber, items, shipmentDate, packingDate, image, storeId } = req.body;
+  const { location, boxNumber, items, shipmentDate, packingDate, image, storeId, toStoreId, currency, exchangeRate, status } = req.body;
 
   const existing = await PackingList.findOne({ company: companyId, boxNumber });
   if (existing) {
@@ -92,6 +94,10 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
 
   if (!storeId) {
     throw ApiError.badRequest('Store ID is required');
+  }
+
+  if (toStoreId && storeId === toStoreId) {
+    throw ApiError.badRequest('Source and destination stores cannot be the same');
   }
 
   const normalizedItems = await normalizeItems(companyId, items ?? []);
@@ -127,7 +133,11 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
     shipmentDate,
     packingDate,
     image,
-    status: 'pending',
+    store: new Types.ObjectId(storeId),
+    toStore: toStoreId ? new Types.ObjectId(toStoreId) : undefined,
+    currency: currency || 'INR',
+    exchangeRate,
+    status: status || 'pending',
     createdBy: new Types.ObjectId(req.user.id)
   });
 
@@ -143,7 +153,9 @@ export const getPackingList = asyncHandler(async (req: Request, res: Response) =
   const packingList = await PackingList.findOne({ _id: req.params.id, company: companyId })
     .populate('items.product', 'name code status')
     .populate('createdBy', 'firstName lastName')
-    .populate('approvedBy', 'firstName lastName');
+    .populate('approvedBy', 'firstName lastName')
+    .populate('store', 'name code')
+    .populate('toStore', 'name code');
 
   if (!packingList) {
     throw ApiError.notFound('Packing list not found');
@@ -164,12 +176,15 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
     throw ApiError.notFound('Packing list not found');
   }
 
-  const { location, items, shipmentDate, packingDate, status, image, storeId } = req.body;
+  const { location, items, shipmentDate, packingDate, status, image, storeId, toStoreId, currency, exchangeRate } = req.body;
 
   if (location) packingList.location = location;
   if (shipmentDate) packingList.shipmentDate = shipmentDate;
   if (packingDate) packingList.packingDate = packingDate;
   if (image) packingList.image = image;
+  if (toStoreId) packingList.toStore = new Types.ObjectId(toStoreId);
+  if (currency) packingList.currency = currency;
+  if (exchangeRate) packingList.exchangeRate = exchangeRate;
 
   if (Array.isArray(items)) {
     const newItems = await normalizeItems(companyId, items);
@@ -240,7 +255,66 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
     packingList.items = newItems;
   }
 
-  if (status && ['pending', 'approved', 'shipped', 'rejected'].includes(status)) {
+  if (status && ['pending', 'in_transit', 'approved', 'shipped', 'rejected'].includes(status)) {
+    // Check if status is changing to approved
+    if (status === 'approved' && packingList.status !== 'approved') {
+      if (!packingList.toStore) {
+        throw ApiError.badRequest('Destination store (To Store) is required for approval');
+      }
+
+      // Move items to destination store
+      for (const item of packingList.items) {
+        // Get the product to retrieve its price
+        const product = await Item.findById(item.product);
+        if (!product) {
+          throw ApiError.badRequest(`Product not found: ${item.product}`);
+        }
+
+        let destStock = await StoreStock.findOne({
+          company: companyId,
+          product: item.product,
+          store: packingList.toStore
+        });
+
+        // Calculate the price based on currency and exchange rate
+        let finalPrice = product.unitPrice || 0;
+        let finalCurrency = packingList.currency || 'INR';
+
+        if (packingList.currency === 'AED' && packingList.exchangeRate && product.unitPrice) {
+          // Convert price to AED using the exchange rate
+          finalPrice = product.unitPrice * packingList.exchangeRate;
+        }
+
+        if (destStock) {
+          // Update existing stock
+          destStock.quantity += item.quantity;
+          destStock.currency = finalCurrency;
+          destStock.priceAfterMargin = finalPrice;
+          destStock.lastUpdatedBy = new Types.ObjectId(req.user?.id);
+        } else {
+          // Create new stock entry
+          destStock = new StoreStock({
+            company: companyId,
+            product: item.product,
+            store: packingList.toStore,
+            quantity: item.quantity,
+            currency: finalCurrency,
+            priceAfterMargin: finalPrice,
+            margin: 0,
+            lastUpdatedBy: new Types.ObjectId(req.user?.id)
+          });
+        }
+        await destStock.save();
+
+        // Also update the Item's currency and price if converting to AED
+        if (packingList.currency === 'AED' && packingList.exchangeRate && product.unitPrice) {
+          product.currency = 'AED';
+          product.unitPrice = finalPrice;
+          await product.save();
+        }
+      }
+    }
+
     packingList.status = status;
     if (['approved', 'shipped'].includes(status) && req.user) {
       packingList.approvedBy = new Types.ObjectId(req.user.id);
@@ -254,7 +328,8 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
   const updatedPackingList = await PackingList.findById(packingList._id)
     .populate('items.product', 'name code status')
     .populate('createdBy', 'firstName lastName')
-    .populate('approvedBy', 'firstName lastName');
+    .populate('approvedBy', 'firstName lastName')
+    .populate('toStore', 'name code');
 
   return respond(res, StatusCodes.OK, updatedPackingList, { message: 'Packing list updated successfully' });
 });
