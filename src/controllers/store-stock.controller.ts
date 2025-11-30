@@ -16,10 +16,14 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
     throw ApiError.badRequest('Company context missing');
   }
 
-  const { search } = req.query;
+  const { search, storeId } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
   const filters: Record<string, unknown> = { company: companyId };
+
+  if (storeId && typeof storeId === 'string') {
+    filters.store = new Types.ObjectId(storeId);
+  }
 
   if (search && typeof search === 'string') {
     const matchingProducts = await Item.find({
