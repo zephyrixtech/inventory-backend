@@ -1,20 +1,20 @@
 import { Router } from 'express';
 import { body, param } from 'express-validator';
 
-import { 
-  listItemConfigurations, 
-  getItemConfiguration, 
-  createItemConfiguration, 
+import {
+  listItemConfigurations,
+  getItemConfiguration,
+  createItemConfiguration,
   createMultipleItemConfigurations,
-  updateItemConfiguration, 
-  deleteItemConfiguration 
+  updateItemConfiguration,
+  deleteItemConfiguration
 } from '../controllers/item-configurator.controller';
 import { authenticate, authorize } from '../middlewares/auth';
 import { validateRequest } from '../middlewares/validate-request';
 
 const router = Router();
 
-router.use(authenticate, authorize(['manage_catalog']));
+// router.use(authenticate, authorize(['manage_catalog']));
 
 router.get('/', listItemConfigurations);
 

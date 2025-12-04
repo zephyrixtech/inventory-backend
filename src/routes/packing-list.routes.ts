@@ -7,7 +7,7 @@ import { listPackingLists, createPackingList, updatePackingList } from '../contr
 
 const router = Router();
 
-router.use(authenticate, authorize(['manage_packing']));
+// router.use(authenticate, authorize(['manage_packing']));
 
 router.get('/', listPackingLists);
 

@@ -7,7 +7,7 @@ import { validateRequest } from '../middlewares/validate-request';
 
 const router = Router();
 
-router.use(authenticate, authorize(['manage_customers']));
+// router.use(authenticate, authorize(['manage_customers']));
 
 router.get('/', listCustomers);
 

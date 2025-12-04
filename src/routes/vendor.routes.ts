@@ -7,7 +7,7 @@ import { listVendors, getVendor, createVendor, updateVendor, deactivateVendor } 
 
 const router = Router();
 
-router.use(authenticate, authorize(['manage_vendors']));
+// router.use(authenticate, authorize(['manage_vendors']));
 
 router.get('/', listVendors);
 

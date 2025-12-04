@@ -7,7 +7,7 @@ import { validateRequest } from '../middlewares/validate-request';
 
 const router = Router();
 
-router.use(authenticate, authorize(['manage_purchase_orders']));
+// router.use(authenticate, authorize(['manage_purchase_orders']));
 
 router.get('/', listPurchaseOrders);
 

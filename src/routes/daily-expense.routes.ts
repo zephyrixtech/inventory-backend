@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { body, param } from 'express-validator';
 
-import { authenticate, authorize } from '../middlewares/auth';
+// import { authenticate, authorize } from '../middlewares/auth';
 import { validateRequest } from '../middlewares/validate-request';
 import { listDailyExpenses, createDailyExpense, deleteDailyExpense } from '../controllers/daily-expense.controller';
 
 const router = Router();
 
-router.use(authenticate, authorize(['manage_expenses']));
+// router.use(authenticate, authorize(['manage_expenses']));
 
 router.get('/', listDailyExpenses);
 
