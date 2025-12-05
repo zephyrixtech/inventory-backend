@@ -85,7 +85,7 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
     throw ApiError.badRequest('Company context missing');
   }
 
-  const { location, boxNumber, items, shipmentDate, packingDate, image, storeId, toStoreId, currency, exchangeRate, status } = req.body;
+  const { location, boxNumber, items, shipmentDate, packingDate, image1, image2, storeId, toStoreId, currency, exchangeRate, status } = req.body;
 
   const existing = await PackingList.findOne({ company: companyId, boxNumber });
   if (existing) {
@@ -132,7 +132,8 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
     items: normalizedItems,
     shipmentDate,
     packingDate,
-    image,
+    image1,
+    image2,
     store: new Types.ObjectId(storeId),
     toStore: toStoreId ? new Types.ObjectId(toStoreId) : undefined,
     currency: currency || 'INR',
@@ -176,12 +177,13 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
     throw ApiError.notFound('Packing list not found');
   }
 
-  const { location, items, shipmentDate, packingDate, status, image, storeId, toStoreId, currency, exchangeRate } = req.body;
+  const { location, items, shipmentDate, packingDate, status, image1, image2, storeId, toStoreId, currency, exchangeRate } = req.body;
 
   if (location) packingList.location = location;
   if (shipmentDate) packingList.shipmentDate = shipmentDate;
   if (packingDate) packingList.packingDate = packingDate;
-  if (image) packingList.image = image;
+  if (image1 !== undefined) packingList.image1 = image1;
+  if (image2 !== undefined) packingList.image2 = image2;
   if (toStoreId) packingList.toStore = new Types.ObjectId(toStoreId);
   if (currency) packingList.currency = currency;
   if (exchangeRate) packingList.exchangeRate = exchangeRate;
@@ -354,4 +356,3 @@ export const deletePackingList = asyncHandler(async (req: Request, res: Response
 
   return respond(res, StatusCodes.OK, { success: true }, { message: 'Packing list deleted successfully' });
 });
-

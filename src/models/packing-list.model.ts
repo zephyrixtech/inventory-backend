@@ -11,7 +11,8 @@ export interface PackingListDocument extends Document<Types.ObjectId> {
   boxNumber: string;
   items: PackingListItem[];
   totalQuantity: number;
-  image?: string;
+  image1?: string;
+  image2?: string;
   shipmentDate?: Date;
   packingDate?: Date;
   store?: Types.ObjectId;
@@ -41,7 +42,8 @@ const packingListSchema = new Schema<PackingListDocument>(
     boxNumber: { type: String, required: true, trim: true },
     items: { type: [packingListItemSchema], default: [] },
     totalQuantity: { type: Number, default: 0, min: 0 },
-    image: { type: String },
+    image1: { type: String },
+    image2: { type: String },
     shipmentDate: { type: Date },
     packingDate: { type: Date },
     store: { type: Schema.Types.ObjectId, ref: 'Store' },
@@ -66,4 +68,3 @@ packingListSchema.pre('save', function (next) {
 });
 
 export const PackingList = model<PackingListDocument>('PackingList', packingListSchema);
-
