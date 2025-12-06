@@ -9,14 +9,15 @@ import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
 
 export const submitQualityCheck = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId || !req.user) {
-    throw ApiError.badRequest('Company context missing');
+  // Removed company context check since we're removing company context
+  if (!req.user) {
+    throw ApiError.badRequest('User context missing');
   }
 
   const { productId, status, remarks, damagedQuantity } = req.body;
 
-  const product = await Item.findOne({ _id: productId, company: companyId });
+  // Removed company filter since we're removing company context
+  const product = await Item.findById(productId);
 
   if (!product) {
     throw ApiError.notFound('Product not found');
@@ -56,9 +57,10 @@ export const submitQualityCheck = asyncHandler(async (req: Request, res: Respons
     updatePayload.damagedQuantity = sanitizedDamagedQuantity;
   }
 
+  // Removed company filter since we're removing company context
   const qcRecord =
     (await QualityCheck.findOneAndUpdate(
-      { company: companyId, product: product._id },
+      { product: product._id },
       updatePayload,
       { upsert: true, new: true, setDefaultsOnInsert: true }
     )) ?? null;
@@ -86,12 +88,10 @@ export const submitQualityCheck = asyncHandler(async (req: Request, res: Respons
 });
 
 export const getQualityCheck = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const record = await QualityCheck.findOne({ company: companyId, product: req.params.productId });
+  // Removed company filter since we're removing company context
+  const record = await QualityCheck.findOne({ product: req.params.productId });
 
   if (!record) {
     throw ApiError.notFound('Quality check record not found');
@@ -99,4 +99,3 @@ export const getQualityCheck = asyncHandler(async (req: Request, res: Response) 
 
   return respond(res, StatusCodes.OK, record);
 });
-

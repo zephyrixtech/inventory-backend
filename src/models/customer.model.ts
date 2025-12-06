@@ -1,7 +1,7 @@
 import { Schema, model, type Document, type Types } from 'mongoose';
 
 export interface CustomerDocument extends Document<Types.ObjectId> {
-  company: Types.ObjectId;
+  // Removed company field since we're removing company context
   customerId: string;
   name: string;
   email?: string;
@@ -18,7 +18,7 @@ export interface CustomerDocument extends Document<Types.ObjectId> {
 
 const customerSchema = new Schema<CustomerDocument>(
   {
-    company: { type: Schema.Types.ObjectId, ref: 'Company', required: true, index: true },
+    // Removed company field since we're removing company context
     customerId: { type: String, required: true, trim: true },
     name: { type: String, required: true, trim: true },
     email: { type: String, trim: true, lowercase: true },
@@ -35,8 +35,8 @@ const customerSchema = new Schema<CustomerDocument>(
   }
 );
 
-customerSchema.index({ company: 1, customerId: 1 }, { unique: true });
-customerSchema.index({ company: 1, name: 1 });
+// Removed company indexes since we're removing company context
+// customerSchema.index({ company: 1, customerId: 1 }, { unique: true });
+// customerSchema.index({ company: 1, name: 1 });
 
 export const Customer = model<CustomerDocument>('Customer', customerSchema);
-

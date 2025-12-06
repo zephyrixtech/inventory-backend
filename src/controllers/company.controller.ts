@@ -7,30 +7,34 @@ import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
 
 export const getCompany = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
-
-  const company = await Company.findById(companyId);
-
+  // Since we're removing company context, we'll return a default company or create one if none exists
+  let company = await Company.findOne({ isActive: true });
+  
+  // If no company exists, create a default one
   if (!company) {
-    throw ApiError.notFound('Company not found');
+    company = await Company.create({
+      name: 'Default Company',
+      code: 'DEFAULT',
+      currency: 'USD',
+      isActive: true
+    });
   }
 
   return respond(res, StatusCodes.OK, company);
 });
 
 export const updateCompany = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
-
-  const company = await Company.findById(companyId);
-
+  // Since we're removing company context, we'll update the first available company or create one
+  let company = await Company.findOne({ isActive: true });
+  
+  // If no company exists, create a default one
   if (!company) {
-    throw ApiError.notFound('Company not found');
+    company = await Company.create({
+      name: 'Default Company',
+      code: 'DEFAULT',
+      currency: 'USD',
+      isActive: true
+    });
   }
 
   const {
@@ -77,37 +81,16 @@ export const updateCompany = asyncHandler(async (req: Request, res: Response) =>
   if (ifscCode !== undefined) company.ifscCode = ifscCode;
   if (ibanCode !== undefined) company.ibanCode = ibanCode;
 
-  // Update system settings
+  // Update reports
+  if (purchaseOrderReport !== undefined) company.purchaseOrderReport = purchaseOrderReport;
+  if (salesReport !== undefined) company.salesReport = salesReport;
+  if (stockReport !== undefined) company.stockReport = stockReport;
+
+  // Update email settings
   if (emailRefreshToken !== undefined) company.emailRefreshToken = emailRefreshToken;
   if (isEmailAuthenticated !== undefined) company.isEmailAuthenticated = isEmailAuthenticated;
-
-  // Update report configurations
-  if (purchaseOrderReport !== undefined) {
-    company.purchaseOrderReport = {
-      paymentDetails: purchaseOrderReport.paymentDetails ?? purchaseOrderReport.payment_details ?? company.purchaseOrderReport?.paymentDetails,
-      remarks: purchaseOrderReport.remarks ?? company.purchaseOrderReport?.remarks,
-      reportFooter: purchaseOrderReport.reportFooter ?? purchaseOrderReport.report_footer ?? company.purchaseOrderReport?.reportFooter
-    };
-  }
-
-  if (salesReport !== undefined) {
-    company.salesReport = {
-      paymentDetails: salesReport.paymentDetails ?? salesReport.payment_details ?? company.salesReport?.paymentDetails,
-      remarks: salesReport.remarks ?? company.salesReport?.remarks,
-      reportFooter: salesReport.reportFooter ?? salesReport.report_footer ?? company.salesReport?.reportFooter
-    };
-  }
-
-  if (stockReport !== undefined) {
-    company.stockReport = {
-      paymentDetails: stockReport.paymentDetails ?? stockReport.payment_details ?? company.stockReport?.paymentDetails,
-      remarks: stockReport.remarks ?? company.stockReport?.remarks,
-      reportFooter: stockReport.reportFooter ?? stockReport.report_footer ?? company.stockReport?.reportFooter
-    };
-  }
 
   await company.save();
 
   return respond(res, StatusCodes.OK, company, { message: 'Company updated successfully' });
 });
-

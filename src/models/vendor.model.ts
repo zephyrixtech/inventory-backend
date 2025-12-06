@@ -1,7 +1,7 @@
 import { Schema, model, type Document, type Types } from 'mongoose';
 
-export interface VendorDocument extends Document<Types.ObjectId> {
-  company: Types.ObjectId;
+export interface VendorDocument extends Document {
+  // Removed company field since we're removing company context
   name: string;
   contactPerson?: string;
   phone?: string;
@@ -18,7 +18,7 @@ export interface VendorDocument extends Document<Types.ObjectId> {
 
 const vendorSchema = new Schema<VendorDocument>(
   {
-    company: { type: Schema.Types.ObjectId, ref: 'Company', required: true, index: true },
+    // Removed company field since we're removing company context
     name: { type: String, required: true, trim: true },
     contactPerson: { type: String, trim: true },
     phone: { type: String, trim: true },
@@ -35,7 +35,7 @@ const vendorSchema = new Schema<VendorDocument>(
   }
 );
 
-vendorSchema.index({ company: 1, name: 1 }, { unique: true });
+// Removed company index since we're removing company context
+// vendorSchema.index({ company: 1, name: 1 }, { unique: true });
 
 export const Vendor = model<VendorDocument>('Vendor', vendorSchema);
-

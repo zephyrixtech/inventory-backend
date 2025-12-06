@@ -65,12 +65,12 @@ export const authenticate = asyncHandler(async (req: Request, _res: Response, ne
 
     req.user = {
       id: user._id.toString(),
-      company: user.company.toString(),
+      // Removed company field since we're removing company context
       role: resolvedRoleId,
       permissions: resolvedPermissions
     };
-    req.companyId = user.company;
-
+    // Removed companyId assignment since we're removing company context
+    
     next();
   } catch (error) {
     logger.warn({ error }, 'Failed to authenticate request');
@@ -97,4 +97,3 @@ export const authorize =
 
     next();
   };
-

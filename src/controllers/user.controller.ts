@@ -1,21 +1,21 @@
 import type { Request, Response } from 'express';
-import { StatusCodes } from 'http-status-codes';
 import bcrypt from 'bcryptjs';
+import { Types } from 'mongoose';
+import { StatusCodes } from 'http-status-codes';
 
 import { User, type UserDocument } from '../models/user.model';
 import { ApiError } from '../utils/api-error';
 import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
+import { config } from '../config/env';
 import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
-import { config } from '../config/env';
 
-const VALID_ROLES = ['superadmin', 'admin', 'purchaser', 'biller'] as const;
-
-type ValidRole = (typeof VALID_ROLES)[number];
+type ValidRole = 'superadmin' | 'admin' | 'purchaser' | 'biller';
+const VALID_ROLES: ValidRole[] = ['superadmin', 'admin', 'purchaser', 'biller'];
 
 const sanitizeUser = (user: UserDocument) => ({
-  id: user._id,
+  id: user._id.toString(),
   firstName: user.firstName,
   lastName: user.lastName,
   email: user.email,
@@ -23,24 +23,20 @@ const sanitizeUser = (user: UserDocument) => ({
   role: user.role,
   status: user.status,
   isActive: user.isActive,
+  avatarUrl: user.avatarUrl,
+  lastLoginAt: user.lastLoginAt,
   createdAt: user.createdAt,
-  updatedAt: user.updatedAt,
-  failedAttempts: user.failedAttempts,
-  lastLoginAt: user.lastLoginAt
+  updatedAt: user.updatedAt
 });
 
 export const listUsers = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
-
+  // Removed company context check since we're removing company context
+  
   const { status, role, search } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
-  const filters: Record<string, unknown> = {
-    company: companyId
-  };
+  const filters: Record<string, unknown> = {};
+  // Removed company filter since we're removing company context
 
   if (status && status !== 'all') {
     filters.status = status;
@@ -70,21 +66,13 @@ export const listUsers = asyncHandler(async (req: Request, res: Response) => {
 
   const [users, total] = await Promise.all([query.exec(), User.countDocuments(filters)]);
 
-  return respond(
-    res,
-    StatusCodes.OK,
-    users.map((user) => sanitizeUser(user)),
-    buildPaginationMeta(page, limit, total)
-  );
+  return respond(res, StatusCodes.OK, users.map((user) => sanitizeUser(user)), buildPaginationMeta(page, limit, total));
 });
 
 export const getUser = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const user = await User.findOne({ _id: req.params.id, company: companyId });
+  const user = await User.findById(req.params.id);
 
   if (!user) {
     throw ApiError.notFound('User not found');
@@ -94,9 +82,7 @@ export const getUser = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const createUser = asyncHandler(async (req: Request, res: Response) => {
-  if (!req.companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
   const { firstName, lastName, email, phone, role, status = 'active', password } = req.body;
 
@@ -113,7 +99,7 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
   const passwordHash = await bcrypt.hash(password, config.password.saltRounds);
 
   const user = await User.create({
-    company: req.companyId,
+    // Removed company field since we're removing company context
     firstName,
     lastName,
     email,
@@ -128,12 +114,9 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const updateUser = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const user = await User.findOne({ _id: req.params.id, company: companyId });
+  const user = await User.findById(req.params.id);
 
   if (!user) {
     throw ApiError.notFound('User not found');
@@ -176,12 +159,9 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const user = await User.findOne({ _id: req.params.id, company: companyId });
+  const user = await User.findById(req.params.id);
 
   if (!user) {
     throw ApiError.notFound('User not found');
@@ -193,4 +173,3 @@ export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
 
   return respond(res, StatusCodes.OK, { success: true }, { message: 'User deactivated successfully' });
 });
-

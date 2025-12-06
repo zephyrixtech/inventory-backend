@@ -1,7 +1,7 @@
 import { Schema, model, type Document, type Types } from 'mongoose';
 
-export interface CategoryDocument extends Document<Types.ObjectId> {
-  company: Types.ObjectId;
+export interface CategoryDocument extends Document {
+  // Removed company field since we're removing company context
   name: string;
   description?: string;
   isActive: boolean;
@@ -12,7 +12,7 @@ export interface CategoryDocument extends Document<Types.ObjectId> {
 
 const categorySchema = new Schema<CategoryDocument>(
   {
-    company: { type: Schema.Types.ObjectId, ref: 'Company', required: true, index: true },
+    // Removed company field since we're removing company context
     name: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
     isActive: { type: Boolean, default: true },
@@ -23,6 +23,7 @@ const categorySchema = new Schema<CategoryDocument>(
   }
 );
 
-categorySchema.index({ company: 1, name: 1 }, { unique: true });
+// Removed company index since we're removing company context
+// categorySchema.index({ company: 1, name: 1 }, { unique: true });
 
 export const Category = model<CategoryDocument>('Category', categorySchema);

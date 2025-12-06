@@ -9,17 +9,13 @@ import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
 
 export const listSuppliers = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
   const { status, contact, search } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
-  const filters: Record<string, unknown> = {
-    company: companyId
-  };
+  const filters: Record<string, unknown> = {};
+  // Removed company filter since we're removing company context
 
   if (status && status !== 'all') {
     filters.status = status;
@@ -53,12 +49,9 @@ export const listSuppliers = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const getSupplier = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const supplier = await Supplier.findOne({ _id: req.params.id, company: companyId });
+  const supplier = await Supplier.findById(req.params.id);
 
   if (!supplier) {
     throw ApiError.notFound('Supplier not found');
@@ -68,10 +61,7 @@ export const getSupplier = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const createSupplier = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
   const { 
     supplierId, 
@@ -103,13 +93,13 @@ export const createSupplier = asyncHandler(async (req: Request, res: Response) =
     selectedSubcategories
   } = req.body;
 
-  const existing = await Supplier.findOne({ company: companyId, supplierId });
+  const existing = await Supplier.findOne({ supplierId });
   if (existing) {
     throw ApiError.conflict('Supplier with this ID already exists');
   }
 
   const supplier = await Supplier.create({
-    company: companyId,
+    // Removed company field since we're removing company context
     supplierId,
     name,
     email,
@@ -139,18 +129,15 @@ export const createSupplier = asyncHandler(async (req: Request, res: Response) =
     selectedSubcategories,
     createdBy: req.user?.id
   });
- console.log(supplier,"supplier^^^^^^^^^^^^^");
- 
+console.log(supplier,"supplier^^^^^^^^^^^^^");
+
   return respond(res, StatusCodes.CREATED, supplier, { message: 'Supplier created successfully' });
 });
 
 export const updateSupplier = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const supplier = await Supplier.findOne({ _id: req.params.id, company: companyId });
+  const supplier = await Supplier.findById(req.params.id);
 
   if (!supplier) {
     throw ApiError.notFound('Supplier not found');
@@ -220,20 +207,15 @@ export const updateSupplier = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const deleteSupplier = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const supplier = await Supplier.findOne({ _id: req.params.id, company: companyId });
+  const supplier = await Supplier.findById(req.params.id);
 
   if (!supplier) {
     throw ApiError.notFound('Supplier not found');
   }
 
-  supplier.isActive = false;
-  supplier.status = 'rejected';
-  await supplier.save();
+  await Supplier.deleteOne({ _id: supplier._id });
 
-  return respond(res, StatusCodes.OK, { success: true }, { message: 'Supplier deactivated successfully' });
+  return respond(res, StatusCodes.OK, { success: true }, { message: 'Supplier deleted successfully' });
 });

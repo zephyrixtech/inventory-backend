@@ -7,14 +7,12 @@ import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
 
 export const listRoles = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
   const includeHidden = req.query.includeHidden === 'true';
 
-  const roles = await Role.find({ company: companyId, isActive: true })
+  // Removed company filter since we're removing company context
+  const roles = await Role.find({ isActive: true })
     .sort({ createdAt: -1 })
     .lean();
 
@@ -26,7 +24,8 @@ export const listRoles = asyncHandler(async (req: Request, res: Response) => {
 export const createRole = asyncHandler(async (req: Request, res: Response) => {
   const { name, description, permissions = [] } = req.body;
 
-  const existingRole = await Role.findOne({ company: req.companyId, name });
+  // Removed company filter since we're removing company context
+  const existingRole = await Role.findOne({ name });
   if (existingRole) {
     throw ApiError.conflict('Role with this name already exists');
   }
@@ -34,8 +33,8 @@ export const createRole = asyncHandler(async (req: Request, res: Response) => {
   const role = await Role.create({
     name,
     description,
-    permissions,
-    company: req.companyId
+    permissions
+    // Removed company field since we're removing company context
   });
 
   return respond(res, StatusCodes.CREATED, role, { message: 'Role created successfully' });
@@ -44,7 +43,8 @@ export const createRole = asyncHandler(async (req: Request, res: Response) => {
 export const updateRole = asyncHandler(async (req: Request, res: Response) => {
   const { name, description, permissions, isActive } = req.body;
 
-  const role = await Role.findOne({ _id: req.params.id, company: req.companyId });
+  // Removed company filter since we're removing company context
+  const role = await Role.findById(req.params.id);
   if (!role) {
     throw ApiError.notFound('Role not found');
   }
@@ -60,7 +60,8 @@ export const updateRole = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const deleteRole = asyncHandler(async (req: Request, res: Response) => {
-  const role = await Role.findOne({ _id: req.params.id, company: req.companyId });
+  // Removed company filter since we're removing company context
+  const role = await Role.findById(req.params.id);
   if (!role) {
     throw ApiError.notFound('Role not found');
   }
@@ -70,4 +71,3 @@ export const deleteRole = asyncHandler(async (req: Request, res: Response) => {
 
   return respond(res, StatusCodes.OK, { success: true }, { message: 'Role deactivated successfully' });
 });
-

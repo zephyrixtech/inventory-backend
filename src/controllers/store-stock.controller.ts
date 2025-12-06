@@ -11,15 +11,12 @@ import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
 
 export const listStoreStock = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
 
   const { search, storeId } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
-  const filters: Record<string, unknown> = { company: companyId };
+  // Removed company context - using empty filters object
+  const filters: Record<string, unknown> = {};
 
   if (storeId && typeof storeId === 'string') {
     filters.store = new Types.ObjectId(storeId);
@@ -27,7 +24,7 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
 
   if (search && typeof search === 'string') {
     const matchingProducts = await Item.find({
-      company: companyId,
+      // Removed company filter since we're removing company context
       $or: [{ name: new RegExp(search, 'i') }, { code: new RegExp(search, 'i') }]
     }).select('_id');
     filters.product = { $in: matchingProducts.map((p) => p._id) };
@@ -52,14 +49,15 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const upsertStoreStock = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId || !req.user) {
-    throw ApiError.badRequest('Company context missing');
+  // Removed company context check since we're removing company context
+  if (!req.user) {
+    throw ApiError.badRequest('User context missing');
   }
 
   const { productId, storeId, quantity, margin, currency } = req.body;
 
-  const product = await Item.findOne({ _id: productId, company: companyId });
+  // Removed company filter since we're removing company context
+  const product = await Item.findById(productId);
 
   if (!product) {
     throw ApiError.notFound('Product not found');
@@ -79,8 +77,9 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
   const marginPercentage = Number(margin ?? 0);
   const priceAfterMargin = basePrice + (basePrice * marginPercentage) / 100;
 
+  // Removed company filter since we're removing company context
   const stock = await StoreStock.findOneAndUpdate(
-    { company: companyId, product: product._id, store: storeId ? new Types.ObjectId(storeId) : null },
+    { product: product._id, store: storeId ? new Types.ObjectId(storeId) : null },
     {
       quantity,
       margin: marginPercentage,
@@ -97,14 +96,15 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
 });
 
 export const adjustStockQuantity = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId || !req.user) {
-    throw ApiError.badRequest('Company context missing');
+  // Removed company context check since we're removing company context
+  if (!req.user) {
+    throw ApiError.badRequest('User context missing');
   }
 
   const { quantity } = req.body;
 
-  const stock = await StoreStock.findOne({ _id: req.params.id, company: companyId });
+  // Removed company filter since we're removing company context
+  const stock = await StoreStock.findById(req.params.id);
 
   if (!stock) {
     throw ApiError.notFound('Store stock record not found');
@@ -121,4 +121,3 @@ export const adjustStockQuantity = asyncHandler(async (req: Request, res: Respon
 
   return respond(res, StatusCodes.OK, stock, { message: 'Stock quantity adjusted successfully' });
 });
-

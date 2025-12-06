@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { body, param } from 'express-validator';
 
-import { listItems, getItem, createItem, updateItem, deleteItem } from '../controllers/item.controller';
+import { listItem, getItem, createItem, updateItem, deleteItem } from '../controllers/item.controller';
 import { authenticate, authorize } from '../middlewares/auth';
 import { validateRequest } from '../middlewares/validate-request';
 
@@ -9,7 +9,7 @@ const router = Router();
 
 // router.use(authenticate, authorize(['manage_catalog']));
 
-router.get('/', listItems);
+router.get('/', listItem);
 
 router.get('/:id', [param('id').isMongoId().withMessage('Invalid item ID')], validateRequest, getItem);
 
@@ -47,4 +47,3 @@ router.put(
 router.delete('/:id', [param('id').isMongoId().withMessage('Invalid item ID')], validateRequest, deleteItem);
 
 export default router;
-

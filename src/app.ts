@@ -8,7 +8,8 @@ import apiRouter from './routes';
 import { notFoundHandler } from './middlewares/not-found';
 import { errorHandler } from './middlewares/error-handler';
 import { apiRateLimiter } from './middlewares/rate-limiter';
-import { attachDefaultCompany } from './middlewares/company-context';
+// Commented out company context middleware since we're removing company context
+// import { attachDefaultCompany } from './middlewares/company-context';
 
 export const createApp = () => {
   const app = express();
@@ -28,7 +29,8 @@ export const createApp = () => {
       skip: () => process.env.NODE_ENV === 'test'
     })
   );
-  app.use(attachDefaultCompany);
+  // Commented out company context middleware since we're removing company context
+  // app.use(attachDefaultCompany);
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -41,4 +43,3 @@ export const createApp = () => {
 
   return app;
 };
-

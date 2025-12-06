@@ -10,14 +10,12 @@ import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
 
 export const getPurchaseReport = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
   const { from, to } = req.query;
 
-  const filters: Record<string, unknown> = { company: companyId };
+  // Removed company context - using empty filters object
+  const filters: Record<string, unknown> = {};
 
   if (from || to) {
     filters.orderDate = {};
@@ -38,25 +36,21 @@ export const getPurchaseReport = asyncHandler(async (req: Request, res: Response
 });
 
 export const getStockReport = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const stock = await StoreStock.find({ company: companyId }).populate('product', 'name code quantity unitPrice currency status');
+  // Removed company filter since we're removing company context
+  const stock = await StoreStock.find().populate('product', 'name code quantity unitPrice currency status');
 
   return respond(res, StatusCodes.OK, stock);
 });
 
 export const getSalesReport = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
   const { customerId } = req.query;
 
-  const filters: Record<string, unknown> = { company: companyId };
+  // Removed company context - using empty filters object
+  const filters: Record<string, unknown> = {};
 
   if (customerId) {
     filters.customer = customerId;
@@ -71,13 +65,10 @@ export const getSalesReport = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const getExpenseReport = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const expenses = await DailyExpense.find({ company: companyId }).populate('product', 'name code');
+  // Removed company filter since we're removing company context
+  const expenses = await DailyExpense.find().populate('product', 'name code');
 
   return respond(res, StatusCodes.OK, expenses);
 });
-

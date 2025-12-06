@@ -4,11 +4,10 @@ declare module 'express-serve-static-core' {
   interface Request {
     user?: {
       id: string;
-      company: string;
+      // Removed company field since we're removing company context
       role: string;
       permissions?: string[];
     };
-    companyId?: Types.ObjectId;
+    // Removed companyId property since we're removing company context
   }
 }
-

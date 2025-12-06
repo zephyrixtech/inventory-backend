@@ -22,7 +22,7 @@ type NormalizedInvoiceItem = {
 };
 
 const normalizeInvoiceItems = async (
-  companyId: NonNullable<Request['companyId']>,
+  // Removed company context - changed parameter type
   items: Array<{ itemId: string; description?: string; quantity: number; unitPrice: number; discount?: number }>
 ) => {
   if (!Array.isArray(items) || items.length === 0) {
@@ -32,7 +32,8 @@ const normalizeInvoiceItems = async (
   const normalized: NormalizedInvoiceItem[] = [];
 
   for (const entry of items) {
-    const item = await Item.findOne({ _id: entry.itemId, company: companyId });
+    // Removed company filter since we're removing company context
+    const item = await Item.findById(entry.itemId);
     if (!item) {
       throw ApiError.badRequest(`Invalid item: ${entry.itemId}`);
     }
@@ -57,17 +58,12 @@ const normalizeInvoiceItems = async (
 };
 
 export const listSalesInvoices = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
-
+  // Removed company context check since we're removing company context
   const { customerId, dateFrom, dateTo, search } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
-  const filters: Record<string, unknown> = {
-    company: companyId
-  };
+  // Removed company context - using empty filters object
+  const filters: Record<string, unknown> = {};
 
   if (customerId && customerId !== 'all') {
     filters.customer = customerId;
@@ -106,12 +102,10 @@ export const listSalesInvoices = asyncHandler(async (req: Request, res: Response
 });
 
 export const getSalesInvoice = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const invoice = await SalesInvoice.findOne({ _id: req.params.id, company: companyId })
+  // Removed company filter since we're removing company context
+  const invoice = await SalesInvoice.findById(req.params.id)
     .populate('customer', 'name email phone')
     .populate('store', 'name code')
     .populate('items.item', 'name code');
@@ -124,21 +118,20 @@ export const getSalesInvoice = asyncHandler(async (req: Request, res: Response) 
 });
 
 export const createSalesInvoice = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
   const { invoiceNumber, invoiceDate, customerId, storeId, items, taxAmount = 0, notes } = req.body;
 
-  const existing = await SalesInvoice.findOne({ company: companyId, invoiceNumber });
+  // Removed company filter since we're removing company context
+  const existing = await SalesInvoice.findOne({ invoiceNumber });
   if (existing) {
     throw ApiError.conflict('Invoice number already exists');
   }
 
+  // Removed company filter since we're removing company context
   const [customer, store] = await Promise.all([
-    Customer.findOne({ _id: customerId, company: companyId, isActive: true }),
-    Store.findOne({ _id: storeId, company: companyId, isActive: true })
+    Customer.findById(customerId),
+    Store.findOne({ _id: storeId, isActive: true })
   ]);
 
   if (!customer) {
@@ -149,14 +142,15 @@ export const createSalesInvoice = asyncHandler(async (req: Request, res: Respons
     throw ApiError.badRequest('Invalid store');
   }
 
-  const normalizedItems = await normalizeInvoiceItems(companyId, items);
+  // Removed company parameter since we're removing company context
+  const normalizedItems = await normalizeInvoiceItems(items);
 
   const subTotal = normalizedItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
   const discountTotal = normalizedItems.reduce((sum, item) => sum + (item.discount ?? 0), 0);
   const netAmount = subTotal - discountTotal + taxAmount;
 
   const invoice = await SalesInvoice.create({
-    company: companyId,
+    // Removed company field since we're removing company context
     invoiceNumber,
     invoiceDate,
     customer: customer._id,
@@ -174,12 +168,10 @@ export const createSalesInvoice = asyncHandler(async (req: Request, res: Respons
 });
 
 export const updateSalesInvoice = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const invoice = await SalesInvoice.findOne({ _id: req.params.id, company: companyId });
+  // Removed company filter since we're removing company context
+  const invoice = await SalesInvoice.findById(req.params.id);
 
   if (!invoice) {
     throw ApiError.notFound('Sales invoice not found');
@@ -192,7 +184,8 @@ export const updateSalesInvoice = asyncHandler(async (req: Request, res: Respons
   if (notes) invoice.notes = notes;
 
   if (Array.isArray(items)) {
-    const normalizedItems = await normalizeInvoiceItems(companyId, items);
+    // Removed company parameter since we're removing company context
+    const normalizedItems = await normalizeInvoiceItems(items);
     const subTotal = normalizedItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
     const discountTotal = normalizedItems.reduce((sum, item) => sum + (item.discount ?? 0), 0);
     invoice.items = normalizedItems;
@@ -207,12 +200,10 @@ export const updateSalesInvoice = asyncHandler(async (req: Request, res: Respons
 });
 
 export const deleteSalesInvoice = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const invoice = await SalesInvoice.findOne({ _id: req.params.id, company: companyId });
+  // Removed company filter since we're removing company context
+  const invoice = await SalesInvoice.findById(req.params.id);
 
   if (!invoice) {
     throw ApiError.notFound('Sales invoice not found');
@@ -222,4 +213,3 @@ export const deleteSalesInvoice = asyncHandler(async (req: Request, res: Respons
 
   return respond(res, StatusCodes.OK, { success: true }, { message: 'Sales invoice deleted successfully' });
 });
-
