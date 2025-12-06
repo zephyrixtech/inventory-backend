@@ -7,7 +7,6 @@ export interface PackingListItem {
 
 export interface PackingListDocument extends Document<Types.ObjectId> {
   company: Types.ObjectId;
-  location: string;
   boxNumber: string;
   items: PackingListItem[];
   totalQuantity: number;
@@ -38,7 +37,6 @@ const packingListItemSchema = new Schema<PackingListItem>(
 const packingListSchema = new Schema<PackingListDocument>(
   {
     company: { type: Schema.Types.ObjectId, ref: 'Company', required: true, index: true },
-    location: { type: String, required: true, trim: true },
     boxNumber: { type: String, required: true, trim: true },
     items: { type: [packingListItemSchema], default: [] },
     totalQuantity: { type: Number, default: 0, min: 0 },

@@ -11,9 +11,6 @@ const router = Router();
 router.post(
   '/register',
   [
-    body('companyName').notEmpty().withMessage('Company name is required'),
-    body('companyCode').notEmpty().withMessage('Company code is required'),
-    body('currency').notEmpty().withMessage('Currency is required'),
     body('firstName').notEmpty().withMessage('First name is required'),
     body('lastName').notEmpty().withMessage('Last name is required'),
     body('email').isEmail().withMessage('Valid email is required'),

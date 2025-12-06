@@ -9,70 +9,21 @@ import { ApiError } from '../utils/api-error';
 import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
 
-export const listStores = asyncHandler(async (req: Request, res: Response) => {
-  // Removed company context check since we're removing company context
-
-  const stores = await Store.find({ isActive: true })
-    .populate('manager', 'firstName lastName email')
-    .populate('parent', 'name code type')
-    .sort({ name: 1 });
-
-  return respond(res, StatusCodes.OK, stores);
-});
-
 export const createStore = asyncHandler(async (req: Request, res: Response) => {
   // Removed company context check since we're removing company context
 
-  const { name, code, type, parentId, managerId, phone, email, address, city, state, postalCode, country, bankName, bankAccountNumber, ifscCode, ibanCode, taxCode, directPurchaseAllowed } = req.body;
+  const { name, code, managerId, phone, email, address, city, state, postalCode, country, bankName, bankAccountNumber, ifscCode, ibanCode, taxCode } = req.body;
 
   const existing = await Store.findOne({ code });
   if (existing) {
     throw ApiError.conflict('Store with this code already exists');
   }
 
-  // Validate type
-  if (type && !['Central Store', 'Branch Store'].includes(type)) {
-    throw ApiError.badRequest('Invalid store type. Must be "Central Store" or "Branch Store"');
-  }
-
-  // Validate parent for branch stores
-  let parent: StoreDocument | null = null;
-  if (parentId) {
-    parent = await Store.findOne({ _id: parentId, isActive: true });
-    if (!parent) {
-      throw ApiError.badRequest('Invalid parent store');
-    }
-    // if (parent.type !== 'Central Store') {
-    //   throw ApiError.badRequest('Parent store must be a Central Store');
-    // }
-  }
-
-  // If type is Branch Store, parent is required
-  const storeType = type || 'Branch Store';
-  if (storeType === 'Branch Store' && !parentId) {
-    throw ApiError.badRequest('Branch Store must have a parent store');
-  }
-
-  // If type is Central Store, parent should be null
-  if (storeType === 'Central Store' && parentId) {
-    throw ApiError.badRequest('Central Store cannot have a parent');
-  }
-
-  let manager: UserDocument | null = null;
-  if (managerId) {
-    manager = await User.findById(managerId);
-    if (!manager) {
-      throw ApiError.badRequest('Invalid store manager');
-    }
-  }
-
-  const store = await Store.create({
+  // Create the store with role-based assignment
+  const storeData: any = {
     // Removed company field since we're removing company context
     name,
     code,
-    type: storeType,
-    parent: parent ? parent._id : undefined,
-    manager: manager ? manager._id : undefined,
     phone,
     email,
     address,
@@ -84,13 +35,28 @@ export const createStore = asyncHandler(async (req: Request, res: Response) => {
     bankAccountNumber,
     ifscCode,
     ibanCode,
-    taxCode,
-    directPurchaseAllowed
-  });
+    taxCode
+  };
+
+  // Assign the store to the selected role
+  if (managerId) {
+    if (managerId === 'purchaser') {
+      // We'll use a special identifier to indicate this store is assigned to the purchaser role
+      storeData.purchaser = 'ROLE_PURCHASER';
+    } else if (managerId === 'biller') {
+      // We'll use a special identifier to indicate this store is assigned to the biller role
+      storeData.biller = 'ROLE_BILLER';
+    }
+    // We can also set a generic manager for administrative purposes
+    storeData.manager = 'ROLE_MANAGER';
+  }
+
+  const store = await Store.create(storeData);
 
   const populatedStore = await Store.findById(store._id)
     .populate('manager', 'firstName lastName email')
-    .populate('parent', 'name code type');
+    .populate('purchaser', 'firstName lastName email')
+    .populate('biller', 'firstName lastName email');
 
   return respond(res, StatusCodes.CREATED, populatedStore, { message: 'Store created successfully' });
 });
@@ -104,7 +70,7 @@ export const updateStore = asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.notFound('Store not found');
   }
 
-  const { name, type, parentId, managerId, phone, email, address, city, state, postalCode, country, bankName, bankAccountNumber, ifscCode, ibanCode, taxCode, directPurchaseAllowed, isActive } = req.body;
+  const { name, managerId, phone, email, address, city, state, postalCode, country, bankName, bankAccountNumber, ifscCode, ibanCode, taxCode, isActive } = req.body;
 
   if (name) store.name = name;
   if (phone !== undefined) store.phone = phone;
@@ -119,53 +85,26 @@ export const updateStore = asyncHandler(async (req: Request, res: Response) => {
   if (ifscCode !== undefined) store.ifscCode = ifscCode;
   if (ibanCode !== undefined) store.ibanCode = ibanCode;
   if (taxCode !== undefined) store.taxCode = taxCode;
-  if (typeof directPurchaseAllowed === 'boolean') store.directPurchaseAllowed = directPurchaseAllowed;
   if (typeof isActive === 'boolean') store.isActive = isActive;
 
-  // Handle type change
-  if (type && ['Central Store', 'Branch Store'].includes(type)) {
-    // If changing to Central Store, remove parent
-    if (type === 'Central Store') {
-      store.parent = undefined;
-    }
-    // If changing to Branch Store, validate parent
-    else if (type === 'Branch Store' && !parentId && !store.parent) {
-      throw ApiError.badRequest('Branch Store must have a parent Central Store');
-    }
-    store.type = type;
-  }
-
-  // Handle parent change
-  if (parentId !== undefined) {
-    if (parentId === null || parentId === '') {
-      if (store.type === 'Branch Store') {
-        throw ApiError.badRequest('Branch Store must have a parent Central Store');
-      }
-      store.parent = undefined;
-    } else {
-      const parent = await Store.findOne({ _id: parentId, isActive: true });
-      if (!parent) {
-        throw ApiError.badRequest('Invalid parent store');
-      }
-      // if (parent.type !== 'Central Store') {
-      //   throw ApiError.badRequest('Parent store must be a Central Store');
-      // }
-      if (parent._id.toString() === store._id.toString()) {
-        throw ApiError.badRequest('Store cannot be its own parent');
-      }
-      store.parent = parent._id;
-    }
-  }
-
+  // Handle role-based assignment
   if (managerId !== undefined) {
     if (managerId === null || managerId === '') {
+      // Clear all role assignments
+      store.purchaser = undefined;
+      store.biller = undefined;
       store.manager = undefined;
     } else {
-      const manager = await User.findById(managerId);
-      if (!manager) {
-        throw ApiError.badRequest('Invalid store manager');
+      // Assign the store to the selected role
+      if (managerId === 'purchaser') {
+        store.purchaser = 'ROLE_PURCHASER';
+        store.biller = undefined;
+      } else if (managerId === 'biller') {
+        store.biller = 'ROLE_BILLER';
+        store.purchaser = undefined;
       }
-      store.manager = manager._id;
+      // We can also set a generic manager for administrative purposes
+      store.manager = 'ROLE_MANAGER';
     }
   }
 
@@ -173,9 +112,47 @@ export const updateStore = asyncHandler(async (req: Request, res: Response) => {
 
   const updatedStore = await Store.findById(store._id)
     .populate('manager', 'firstName lastName email')
-    .populate('parent', 'name code type');
+    .populate('purchaser', 'firstName lastName email')
+    .populate('biller', 'firstName lastName email');
 
   return respond(res, StatusCodes.OK, updatedStore, { message: 'Store updated successfully' });
+});
+
+export const listStores = asyncHandler(async (req: Request, res: Response) => {
+  // Removed company context check since we're removing company context
+  
+  // Get user info from request if available
+  const userId = req.query.userId as string || (req.user ? req.user.id : null);
+  const userRole = req.query.userRole as string || null;
+
+  // Build query conditions
+  const queryConditions: any = { isActive: true };
+
+  // If user is purchaser or biller, only show stores where their role is assigned
+  if (userId && userRole) {
+    if (userRole === 'purchaser') {
+      // Show stores where the purchaser role is assigned
+      queryConditions.$or = [
+        { purchaser: 'ROLE_PURCHASER' },
+        { manager: 'ROLE_MANAGER' }
+      ];
+    } else if (userRole === 'biller') {
+      // Show stores where the biller role is assigned
+      queryConditions.$or = [
+        { biller: 'ROLE_BILLER' },
+        { manager: 'ROLE_MANAGER' }
+      ];
+    }
+    // For admin and superadmin, show all stores (no additional filtering)
+  }
+
+  const stores = await Store.find(queryConditions)
+    .populate('manager', 'firstName lastName email')
+    .populate('purchaser', 'firstName lastName email')
+    .populate('biller', 'firstName lastName email')
+    .sort({ name: 1 });
+
+  return respond(res, StatusCodes.OK, stores);
 });
 
 export const getStore = asyncHandler(async (req: Request, res: Response) => {
@@ -183,7 +160,8 @@ export const getStore = asyncHandler(async (req: Request, res: Response) => {
 
   const store = await Store.findOne({ _id: req.params.id, isActive: true })
     .populate('manager', 'firstName lastName email')
-    .populate('parent', 'name code type');
+    .populate('purchaser', 'firstName lastName email')
+    .populate('biller', 'firstName lastName email');
 
   if (!store) {
     throw ApiError.notFound('Store not found');
@@ -206,13 +184,6 @@ export const deleteStore = asyncHandler(async (req: Request, res: Response) => {
   
   if (inventoryCount > 0) {
     throw ApiError.badRequest('Cannot delete store with associated inventory records');
-  }
-
-  // Check if store is a parent to other stores
-  const childStoreCount = await Store.countDocuments({ parent: store._id });
-  
-  if (childStoreCount > 0) {
-    throw ApiError.badRequest('Cannot delete store that is a parent to other stores');
   }
 
   // Instead of deleting, we'll mark it as inactive

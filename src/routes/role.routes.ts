@@ -7,7 +7,7 @@ import { validateRequest } from '../middlewares/validate-request';
 
 const router = Router();
 
-// router.use(authenticate, authorize(['manage_roles']));
+router.use(authenticate, authorize(['manage_roles']));
 
 router.get('/', listRoles);
 
@@ -18,4 +18,3 @@ router.put('/:id', [param('id').isMongoId()], validateRequest, updateRole);
 router.delete('/:id', [param('id').isMongoId()], validateRequest, deleteRole);
 
 export default router;
-

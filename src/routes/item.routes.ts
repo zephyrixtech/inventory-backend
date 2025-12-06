@@ -7,7 +7,7 @@ import { validateRequest } from '../middlewares/validate-request';
 
 const router = Router();
 
-// router.use(authenticate, authorize(['manage_catalog']));
+router.use(authenticate, authorize(['manage_catalog']));
 
 router.get('/', listItem);
 

@@ -5,7 +5,6 @@ import { config } from '../config/env';
 
 export type TokenPayload = {
   sub: string;
-  company: string;
   role: string;
   permissions?: string[];
 };
@@ -37,10 +36,9 @@ export const verifyRefreshToken = (token: string): TokenPayload & JwtPayload => 
   return jwt.verify(token, refreshTokenSecret) as TokenPayload & JwtPayload;
 };
 
-export const buildTokenPayload = (params: { userId: Types.ObjectId; companyId: Types.ObjectId; roleId: Types.ObjectId; permissions?: string[] }): TokenPayload => {
+export const buildTokenPayload = (params: { userId: Types.ObjectId;  roleId: Types.ObjectId; permissions?: string[] }): TokenPayload => {
   return {
     sub: params.userId.toString(),
-    company: params.companyId.toString(),
     role: params.roleId.toString(),
     permissions: params.permissions
   };

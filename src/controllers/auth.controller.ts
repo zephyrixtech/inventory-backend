@@ -33,7 +33,6 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
 
   const role = await Role.create({
     name: 'Super Admin',
-    company: company._id,
     permissions: ['*'],
     isActive: true
   });
@@ -52,7 +51,6 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
 
   const payload = buildTokenPayload({
     userId: user._id,
-    companyId: company._id,
     roleId: role._id,
     permissions: role.permissions
   });
@@ -79,13 +77,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
         email: user.email,
         role: role.name,
         permissions: role.permissions ?? [],
-        companyId: company._id,
-        company: {
-          id: company._id,
-          name: company.name,
-          code: company.code,
-          currency: company.currency
-        },
+       
         status: user.status,
         isActive: user.isActive
       }
@@ -155,7 +147,6 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
   const payload = buildTokenPayload({
     userId: user._id,
-    companyId: user._id, // Using user._id as companyId since we're removing company context
     roleId: user._id, // Using user._id as roleId since role is a string, not a reference
     permissions: permissions
   });
@@ -230,7 +221,6 @@ export const refresh = asyncHandler(async (req: Request, res: Response) => {
 
     const newPayload = buildTokenPayload({
       userId: user._id,
-      companyId: user._id, // Using user._id as companyId since we're removing company context
       roleId: user._id, // Using user._id as roleId since role is a string, not a reference
       permissions: permissions
     });
@@ -300,7 +290,6 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
     lastName: user.lastName,
     email: user.email,
     role: roleInfo,
-    company: company,
     permissions: permissions
   });
 });

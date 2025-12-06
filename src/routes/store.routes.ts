@@ -19,7 +19,7 @@ router.post(
     body('code').notEmpty(),
     body('type').optional().isIn(['Central Store', 'Branch Store']),
     body('parentId').optional().isMongoId(),
-    body('managerId').optional().isMongoId()
+    body('managerId').optional().isString()
   ],
   validateRequest,
   createStore
@@ -31,7 +31,7 @@ router.put(
     param('id').isMongoId(),
     body('type').optional().isIn(['Central Store', 'Branch Store']),
     body('parentId').optional().isMongoId(),
-    body('managerId').optional().isMongoId()
+    body('managerId').optional().isString()
   ],
   validateRequest,
   updateStore
@@ -40,4 +40,3 @@ router.put(
 router.delete('/:id', [param('id').isMongoId()], validateRequest, deleteStore);
 
 export default router;
-
