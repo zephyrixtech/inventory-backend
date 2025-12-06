@@ -9,17 +9,13 @@ import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
 
 export const listCustomers = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
   const { status, search } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
-  const filters: Record<string, unknown> = {
-    company: companyId
-  };
+  const filters: Record<string, unknown> = {};
+  // Removed company filter since we're removing company context
 
   if (status && status !== 'all') {
     filters.status = status;
@@ -49,12 +45,9 @@ export const listCustomers = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const getCustomer = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const customer = await Customer.findOne({ _id: req.params.id, company: companyId });
+  const customer = await Customer.findById(req.params.id);
 
   if (!customer) {
     throw ApiError.notFound('Customer not found');
@@ -64,20 +57,17 @@ export const getCustomer = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const createCustomer = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
   const { customerId, name, email, phone, contactPerson, status, taxNumber, billingAddress, shippingAddress } = req.body;
 
-  const existing = await Customer.findOne({ company: companyId, customerId });
+  const existing = await Customer.findOne({ customerId });
   if (existing) {
     throw ApiError.conflict('Customer with this ID already exists');
   }
 
   const customer = await Customer.create({
-    company: companyId,
+    // Removed company field since we're removing company context
     customerId,
     name,
     email,
@@ -93,50 +83,43 @@ export const createCustomer = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const updateCustomer = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const customer = await Customer.findOne({ _id: req.params.id, company: companyId });
+  const customer = await Customer.findById(req.params.id);
 
   if (!customer) {
     throw ApiError.notFound('Customer not found');
   }
 
-  const { name, email, phone, contactPerson, status, taxNumber, billingAddress, shippingAddress, isActive } = req.body;
+  const updates: Record<string, unknown> = {};
+  const { customerId, name, email, phone, contactPerson, status, taxNumber, billingAddress, shippingAddress } = req.body;
 
-  if (name) customer.name = name;
-  if (email) customer.email = email;
-  if (phone) customer.phone = phone;
-  if (contactPerson) customer.contactPerson = contactPerson;
-  if (status) customer.status = status;
-  if (taxNumber) customer.taxNumber = taxNumber;
-  if (billingAddress) customer.billingAddress = billingAddress;
-  if (shippingAddress) customer.shippingAddress = shippingAddress;
-  if (typeof isActive === 'boolean') customer.isActive = isActive;
+  if (customerId !== undefined) updates.customerId = customerId;
+  if (name !== undefined) updates.name = name;
+  if (email !== undefined) updates.email = email;
+  if (phone !== undefined) updates.phone = phone;
+  if (contactPerson !== undefined) updates.contactPerson = contactPerson;
+  if (status !== undefined) updates.status = status;
+  if (taxNumber !== undefined) updates.taxNumber = taxNumber;
+  if (billingAddress !== undefined) updates.billingAddress = billingAddress;
+  if (shippingAddress !== undefined) updates.shippingAddress = shippingAddress;
 
+  Object.assign(customer, updates);
   await customer.save();
 
   return respond(res, StatusCodes.OK, customer, { message: 'Customer updated successfully' });
 });
 
 export const deleteCustomer = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const customer = await Customer.findOne({ _id: req.params.id, company: companyId });
+  const customer = await Customer.findById(req.params.id);
 
   if (!customer) {
     throw ApiError.notFound('Customer not found');
   }
 
-  customer.isActive = false;
-  customer.status = 'Inactive';
-  await customer.save();
+  await Customer.deleteOne({ _id: customer._id });
 
-  return respond(res, StatusCodes.OK, { success: true }, { message: 'Customer deactivated successfully' });
+  return respond(res, StatusCodes.OK, { success: true }, { message: 'Customer deleted successfully' });
 });
-

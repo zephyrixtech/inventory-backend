@@ -12,7 +12,6 @@ import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
 
 const normalizeItems = async (
-  companyId: NonNullable<Request['companyId']>,
   items: Array<{ productId: string; quantity: number }>
 ) => {
   if (!Array.isArray(items) || items.length === 0) {
@@ -22,7 +21,7 @@ const normalizeItems = async (
   const normalized: Array<{ product: Types.ObjectId; quantity: number }> = [];
 
   for (const entry of items) {
-    const product = await Item.findOne({ _id: entry.productId, company: companyId });
+    const product = await Item.findById(entry.productId);
     if (!product) {
       throw ApiError.badRequest(`Invalid product: ${entry.productId}`);
     }
@@ -42,15 +41,13 @@ const normalizeItems = async (
 };
 
 export const listPackingLists = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
   const { status, search } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
-  const filters: Record<string, unknown> = { company: companyId };
+  const filters: Record<string, unknown> = {};
+  // Removed company filter since we're removing company context
 
   if (status && status !== 'all') {
     filters.status = status;
@@ -80,14 +77,14 @@ export const listPackingLists = asyncHandler(async (req: Request, res: Response)
 });
 
 export const createPackingList = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId || !req.user) {
-    throw ApiError.badRequest('Company context missing');
+  // Removed company context check since we're removing company context
+  if (!req.user) {
+    throw ApiError.badRequest('User context missing');
   }
 
   const { location, boxNumber, items, shipmentDate, packingDate, image1, image2, storeId, toStoreId, currency, exchangeRate, status } = req.body;
 
-  const existing = await PackingList.findOne({ company: companyId, boxNumber });
+  const existing = await PackingList.findOne({ boxNumber });
   if (existing) {
     throw ApiError.conflict('Packing list with this box number already exists');
   }
@@ -100,12 +97,11 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
     throw ApiError.badRequest('Source and destination stores cannot be the same');
   }
 
-  const normalizedItems = await normalizeItems(companyId, items ?? []);
+  const normalizedItems = await normalizeItems(items ?? []);
 
   // Reduce store stock quantities
   for (const item of normalizedItems) {
     const stock = await StoreStock.findOne({
-      company: companyId,
       product: item.product,
       store: new Types.ObjectId(storeId)
     });
@@ -126,7 +122,7 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
   }
 
   const packingList = await PackingList.create({
-    company: companyId,
+    // Removed company field since we're removing company context
     location,
     boxNumber,
     items: normalizedItems,
@@ -146,12 +142,9 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
 });
 
 export const getPackingList = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const packingList = await PackingList.findOne({ _id: req.params.id, company: companyId })
+  const packingList = await PackingList.findById(req.params.id)
     .populate('items.product', 'name code status')
     .populate('createdBy', 'firstName lastName')
     .populate('approvedBy', 'firstName lastName')
@@ -166,12 +159,9 @@ export const getPackingList = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const updatePackingList = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const packingList = await PackingList.findOne({ _id: req.params.id, company: companyId });
+  const packingList = await PackingList.findById(req.params.id);
 
   if (!packingList) {
     throw ApiError.notFound('Packing list not found');
@@ -189,7 +179,7 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
   if (exchangeRate) packingList.exchangeRate = exchangeRate;
 
   if (Array.isArray(items)) {
-    const newItems = await normalizeItems(companyId, items);
+    const newItems = await normalizeItems(items);
 
     if (storeId) {
       // Create a map of old items for easy lookup
@@ -209,7 +199,6 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
 
         if (diff !== 0) {
           const stock = await StoreStock.findOne({
-            company: companyId,
             product: newItem.product,
             store: new Types.ObjectId(storeId)
           });
@@ -238,7 +227,6 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
       for (const [productId, oldQty] of oldItemsMap) {
         if (!processedProductIds.has(productId)) {
           const stock = await StoreStock.findOne({
-            company: companyId,
             product: new Types.ObjectId(productId),
             store: new Types.ObjectId(storeId)
           });
@@ -273,7 +261,6 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
         }
 
         let destStock = await StoreStock.findOne({
-          company: companyId,
           product: item.product,
           store: packingList.toStore
         });
@@ -296,7 +283,7 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
         } else {
           // Create new stock entry
           destStock = new StoreStock({
-            company: companyId,
+            // Removed company field since we're removing company context
             product: item.product,
             store: packingList.toStore,
             quantity: item.quantity,
@@ -337,12 +324,9 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
 });
 
 export const deletePackingList = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const packingList = await PackingList.findOne({ _id: req.params.id, company: companyId });
+  const packingList = await PackingList.findById(req.params.id);
 
   if (!packingList) {
     throw ApiError.notFound('Packing list not found');

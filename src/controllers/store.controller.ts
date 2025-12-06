@@ -10,12 +10,9 @@ import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
 
 export const listStores = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const stores = await Store.find({ company: companyId, isActive: true })
+  const stores = await Store.find({ isActive: true })
     .populate('manager', 'firstName lastName email')
     .populate('parent', 'name code type')
     .sort({ name: 1 });
@@ -24,14 +21,11 @@ export const listStores = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const createStore = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
   const { name, code, type, parentId, managerId, phone, email, address, city, state, postalCode, country, bankName, bankAccountNumber, ifscCode, ibanCode, taxCode, directPurchaseAllowed } = req.body;
 
-  const existing = await Store.findOne({ company: companyId, code });
+  const existing = await Store.findOne({ code });
   if (existing) {
     throw ApiError.conflict('Store with this code already exists');
   }
@@ -44,7 +38,7 @@ export const createStore = asyncHandler(async (req: Request, res: Response) => {
   // Validate parent for branch stores
   let parent: StoreDocument | null = null;
   if (parentId) {
-    parent = await Store.findOne({ _id: parentId, company: companyId, isActive: true });
+    parent = await Store.findOne({ _id: parentId, isActive: true });
     if (!parent) {
       throw ApiError.badRequest('Invalid parent store');
     }
@@ -66,14 +60,14 @@ export const createStore = asyncHandler(async (req: Request, res: Response) => {
 
   let manager: UserDocument | null = null;
   if (managerId) {
-    manager = await User.findOne({ _id: managerId, company: companyId });
+    manager = await User.findById(managerId);
     if (!manager) {
       throw ApiError.badRequest('Invalid store manager');
     }
   }
 
   const store = await Store.create({
-    company: companyId,
+    // Removed company field since we're removing company context
     name,
     code,
     type: storeType,
@@ -102,12 +96,9 @@ export const createStore = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const updateStore = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const store = await Store.findOne({ _id: req.params.id, company: companyId });
+  const store = await Store.findById(req.params.id);
 
   if (!store) {
     throw ApiError.notFound('Store not found');
@@ -152,7 +143,7 @@ export const updateStore = asyncHandler(async (req: Request, res: Response) => {
       }
       store.parent = undefined;
     } else {
-      const parent = await Store.findOne({ _id: parentId, company: companyId, isActive: true });
+      const parent = await Store.findOne({ _id: parentId, isActive: true });
       if (!parent) {
         throw ApiError.badRequest('Invalid parent store');
       }
@@ -170,7 +161,7 @@ export const updateStore = asyncHandler(async (req: Request, res: Response) => {
     if (managerId === null || managerId === '') {
       store.manager = undefined;
     } else {
-      const manager = await User.findOne({ _id: managerId, company: companyId });
+      const manager = await User.findById(managerId);
       if (!manager) {
         throw ApiError.badRequest('Invalid store manager');
       }
@@ -188,12 +179,9 @@ export const updateStore = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getStore = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const store = await Store.findOne({ _id: req.params.id, company: companyId, isActive: true })
+  const store = await Store.findOne({ _id: req.params.id, isActive: true })
     .populate('manager', 'firstName lastName email')
     .populate('parent', 'name code type');
 
@@ -205,32 +193,31 @@ export const getStore = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const deleteStore = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const store = await Store.findOne({ _id: req.params.id, company: companyId });
+  const store = await Store.findById(req.params.id);
 
   if (!store) {
     throw ApiError.notFound('Store not found');
   }
 
-  // Check if store has child stores (branch stores)
-  const childStores = await Store.find({ parent: store._id, company: companyId, isActive: true });
-  if (childStores.length > 0) {
-    throw ApiError.badRequest('Cannot delete store: It has connected branch stores');
-  }
-
-  // Check if store is used in inventory (which may be linked to purchase orders)
-  const inventoryCount = await Inventory.countDocuments({ store: store._id, company: companyId });
+  // Check if store has any associated inventory records
+  const inventoryCount = await Inventory.countDocuments({ store: store._id });
+  
   if (inventoryCount > 0) {
-    throw ApiError.badRequest('Cannot delete store: It is used in inventory records');
+    throw ApiError.badRequest('Cannot delete store with associated inventory records');
   }
 
+  // Check if store is a parent to other stores
+  const childStoreCount = await Store.countDocuments({ parent: store._id });
+  
+  if (childStoreCount > 0) {
+    throw ApiError.badRequest('Cannot delete store that is a parent to other stores');
+  }
+
+  // Instead of deleting, we'll mark it as inactive
   store.isActive = false;
   await store.save();
 
   return respond(res, StatusCodes.OK, { success: true }, { message: 'Store deactivated successfully' });
 });
-

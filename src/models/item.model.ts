@@ -12,7 +12,7 @@ export type ItemStatus =
 
 export interface ItemDocument extends Document {
   _id: Types.ObjectId;
-  company: Types.ObjectId;
+  // Removed company field since we're removing company context
   name: string;
   code: string;
   category: Types.ObjectId;
@@ -57,12 +57,7 @@ export interface ItemDocument extends Document {
 
 const itemSchema = new Schema<ItemDocument>(
   {
-    company: {
-      type: Schema.Types.ObjectId,
-      ref: 'Company',
-      required: true,
-      index: true
-    },
+    // Removed company field since we're removing company context
     name: {
       type: String,
       required: true,
@@ -210,10 +205,10 @@ const itemSchema = new Schema<ItemDocument>(
   }
 );
 
-// Indexes
-itemSchema.index({ company: 1, code: 1 }, { unique: true });
-itemSchema.index({ company: 1, name: 1 });
-itemSchema.index({ company: 1, status: 1 });
+// Removed company indexes since we're removing company context
+// itemSchema.index({ company: 1, code: 1 }, { unique: true });
+// itemSchema.index({ company: 1, name: 1 });
+// itemSchema.index({ company: 1, status: 1 });
 
 // Existing pre-save hook (keep as is)
 itemSchema.pre('save', function (next) {

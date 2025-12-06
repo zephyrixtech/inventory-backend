@@ -12,17 +12,13 @@ import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
 
 export const listInventory = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
   const { storeId, search } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
-  const filters: Record<string, unknown> = {
-    company: companyId
-  };
+  const filters: Record<string, unknown> = {};
+  // Removed company filter since we're removing company context
 
   if (storeId && storeId !== 'all') {
     filters.store = storeId;
@@ -30,7 +26,6 @@ export const listInventory = asyncHandler(async (req: Request, res: Response) =>
 
   if (search && typeof search === 'string') {
     const matchingItems = await Item.find({
-      company: companyId,
       $or: [{ name: new RegExp(search, 'i') }, { code: new RegExp(search, 'i') }]
     }).select('_id');
 
@@ -56,17 +51,14 @@ export const listInventory = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const createInventoryRecord = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
   const { itemId, storeId, quantity, unitPrice, sellingPrice, stockDate, expiryDate, purchaseOrderId, notes } = req.body;
 
   const [item, store, purchaseOrder] = await Promise.all([
-    Item.findOne({ _id: itemId, company: companyId }),
-    Store.findOne({ _id: storeId, company: companyId }),
-    purchaseOrderId ? PurchaseOrder.findOne({ _id: purchaseOrderId, company: companyId }) : null
+    Item.findById(itemId),
+    Store.findById(storeId),
+    purchaseOrderId ? PurchaseOrder.findById(purchaseOrderId) : null
   ]);
 
   if (!item) {
@@ -77,7 +69,6 @@ export const createInventoryRecord = asyncHandler(async (req: Request, res: Resp
   }
 
   const existingRecord = await Inventory.findOne({
-    company: companyId,
     item: item._id,
     store: store._id
   });
@@ -96,7 +87,7 @@ export const createInventoryRecord = asyncHandler(async (req: Request, res: Resp
   }
 
   const inventory = await Inventory.create({
-    company: companyId,
+    // Removed company field since we're removing company context
     item: item._id,
     store: store._id,
     quantity,
@@ -112,12 +103,9 @@ export const createInventoryRecord = asyncHandler(async (req: Request, res: Resp
 });
 
 export const updateInventoryRecord = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const inventory = await Inventory.findOne({ _id: req.params.id, company: companyId });
+  const inventory = await Inventory.findById(req.params.id);
 
   if (!inventory) {
     throw ApiError.notFound('Inventory record not found');
@@ -138,12 +126,9 @@ export const updateInventoryRecord = asyncHandler(async (req: Request, res: Resp
 });
 
 export const deleteInventoryRecord = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const inventory = await Inventory.findOne({ _id: req.params.id, company: companyId });
+  const inventory = await Inventory.findById(req.params.id);
 
   if (!inventory) {
     throw ApiError.notFound('Inventory record not found');
@@ -153,4 +138,3 @@ export const deleteInventoryRecord = asyncHandler(async (req: Request, res: Resp
 
   return respond(res, StatusCodes.OK, { success: true }, { message: 'Inventory record deleted successfully' });
 });
-

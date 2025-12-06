@@ -22,7 +22,7 @@ type NormalizedPurchaseOrderItem = {
 };
 
 const normalizeItems = async (
-  companyId: NonNullable<Request['companyId']>,
+  // Removed company context - changed parameter type
   items: Array<{ itemId: string; description?: string; quantity: number; unitPrice: number }>
 ) => {
   if (!Array.isArray(items) || items.length === 0) {
@@ -32,7 +32,8 @@ const normalizeItems = async (
   const normalized: NormalizedPurchaseOrderItem[] = [];
 
   for (const entry of items) {
-    const item = await Item.findOne({ _id: entry.itemId, company: companyId });
+    // Removed company filter since we're removing company context
+    const item = await Item.findById(entry.itemId);
     if (!item) {
       throw ApiError.badRequest(`Invalid item: ${entry.itemId}`);
     }
@@ -51,16 +52,13 @@ const normalizeItems = async (
 };
 
 export const listPurchaseOrders = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
   const { status, supplierId, search, dateFrom, dateTo } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
+  // Removed company context - using empty filters object
   const filters: Record<string, unknown> = {
-    company: companyId,
     isActive: true
   };
 
@@ -105,12 +103,10 @@ export const listPurchaseOrders = asyncHandler(async (req: Request, res: Respons
 });
 
 export const getPurchaseOrder = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const order = await PurchaseOrder.findOne({ _id: req.params.id, company: companyId })
+  // Removed company filter since we're removing company context
+  const order = await PurchaseOrder.findById(req.params.id)
     .populate('supplier', 'name email phone')
     .populate('items.item', 'name code')
     .populate('issuedBy', 'firstName lastName');
@@ -123,29 +119,29 @@ export const getPurchaseOrder = asyncHandler(async (req: Request, res: Response)
 });
 
 export const createPurchaseOrder = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
   const { poNumber, supplierId, orderDate, expectedDate, status, items, notes } = req.body;
 
-  const supplier = await Supplier.findOne({ _id: supplierId, company: companyId, isActive: true });
+  // Removed company filter since we're removing company context
+  const supplier = await Supplier.findById(supplierId);
   if (!supplier) {
     throw ApiError.badRequest('Invalid supplier');
   }
 
-  const existing = await PurchaseOrder.findOne({ company: companyId, poNumber });
+  // Removed company filter since we're removing company context
+  const existing = await PurchaseOrder.findOne({ poNumber });
   if (existing) {
     throw ApiError.conflict('Purchase order number already exists');
   }
 
-  const normalizedItems = await normalizeItems(companyId, items);
+  // Removed company parameter since we're removing company context
+  const normalizedItems = await normalizeItems(items);
 
   const totalValue = normalizedItems.reduce((sum, item) => sum + item.totalPrice, 0);
 
   const order = await PurchaseOrder.create({
-    company: companyId,
+    // Removed company field since we're removing company context
     poNumber,
     supplier: supplier._id,
     orderDate,
@@ -162,12 +158,10 @@ export const createPurchaseOrder = asyncHandler(async (req: Request, res: Respon
 });
 
 export const updatePurchaseOrder = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const order = await PurchaseOrder.findOne({ _id: req.params.id, company: companyId });
+  // Removed company filter since we're removing company context
+  const order = await PurchaseOrder.findById(req.params.id);
 
   if (!order) {
     throw ApiError.notFound('Purchase order not found');
@@ -180,7 +174,8 @@ export const updatePurchaseOrder = asyncHandler(async (req: Request, res: Respon
   if (notes) order.notes = notes;
 
   if (Array.isArray(items)) {
-    const normalizedItems = await normalizeItems(companyId, items);
+    // Removed company parameter since we're removing company context
+    const normalizedItems = await normalizeItems(items);
     order.items = normalizedItems;
     order.totalValue = normalizedItems.reduce((sum, item) => sum + item.totalPrice, 0);
   }
@@ -191,12 +186,10 @@ export const updatePurchaseOrder = asyncHandler(async (req: Request, res: Respon
 });
 
 export const deletePurchaseOrder = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const order = await PurchaseOrder.findOne({ _id: req.params.id, company: companyId });
+  // Removed company filter since we're removing company context
+  const order = await PurchaseOrder.findById(req.params.id);
 
   if (!order) {
     throw ApiError.notFound('Purchase order not found');
@@ -207,4 +200,3 @@ export const deletePurchaseOrder = asyncHandler(async (req: Request, res: Respon
 
   return respond(res, StatusCodes.OK, { success: true }, { message: 'Purchase order archived successfully' });
 });
-

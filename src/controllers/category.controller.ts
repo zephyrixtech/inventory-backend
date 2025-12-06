@@ -22,9 +22,8 @@ const serializeCategory = (category: CategoryDocument, itemsCount = 0) => ({
   itemsCount
 });
 
-const ensureNoLinkedItems = async (companyId: string, categoryId: Types.ObjectId) => {
+const ensureNoLinkedItems = async (categoryId: Types.ObjectId) => {
   const linkedItem = await Item.exists({
-    company: new Types.ObjectId(companyId),
     category: categoryId,
     isActive: true
   });
@@ -35,17 +34,13 @@ const ensureNoLinkedItems = async (companyId: string, categoryId: Types.ObjectId
 };
 
 export const listCategories = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
   const { status, search } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
-  const filters: FilterQuery<CategoryDocument> = {
-    company: new Types.ObjectId(companyId)
-  };
+  const filters: FilterQuery<CategoryDocument> = {};
+  // Removed company filter since we're removing company context
 
   if (status && status !== 'all') {
     filters.isActive = status === 'active';
@@ -63,8 +58,10 @@ export const listCategories = asyncHandler(async (req: Request, res: Response) =
     subCategory: 'subCategory',
     createdAt: 'createdAt'
   };
-  const resolvedSortField = sortBy && allowedSortFields[sortBy] ? allowedSortFields[sortBy] : 'createdAt';
-
+  
+  // Ensure sortBy is a string and exists in allowedSortFields
+  const sortField = typeof sortBy === 'string' ? sortBy : '';
+  const resolvedSortField = sortField && allowedSortFields[sortField] ? allowedSortFields[sortField] : 'createdAt';
   const query = Category.find(filters)
     .sort({ [resolvedSortField]: sortOrder === 'asc' ? 1 : -1 })
     .skip((page - 1) * limit)
@@ -79,7 +76,6 @@ export const listCategories = asyncHandler(async (req: Request, res: Response) =
     const aggregation = await Item.aggregate<{ _id: Types.ObjectId; count: number }>([
       {
         $match: {
-          company: new Types.ObjectId(companyId),
           category: { $in: categoryIds },
           isActive: true
         }
@@ -98,26 +94,26 @@ export const listCategories = asyncHandler(async (req: Request, res: Response) =
     }, {});
   }
 
-  const data = categories.map(category => serializeCategory(category, counts[category._id.toString()] ?? 0));
+  const data = categories.map(category => {
+    // Ensure category._id is treated as a string for indexing
+    const categoryIdStr = (category._id as Types.ObjectId).toString();
+    return serializeCategory(category, counts[categoryIdStr] ?? 0);
+  });
 
   return respond(res, StatusCodes.OK, data, buildPaginationMeta(page, limit, total));
 });
 
 export const getCategory = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const category = await Category.findOne({ _id: req.params.id, company: new Types.ObjectId(companyId) });
-
+  const categoryId = typeof req.params.id === 'string' ? req.params.id : '';
+  const category = await Category.findById(categoryId);
   if (!category) {
     throw ApiError.notFound('Category not found');
   }
 
   const itemsCount = await Item.countDocuments({
-    company: new Types.ObjectId(companyId),
-    category: category._id,
+    category: category._id as Types.ObjectId,
     isActive: true
   });
 
@@ -125,20 +121,17 @@ export const getCategory = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const createCategory = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
   const { name, description, isActive, subCategory } = req.body;
 
-  const existing = await Category.findOne({ company: new Types.ObjectId(companyId), name });
+  const existing = await Category.findOne({ name });
   if (existing) {
     throw ApiError.conflict('Category with this name already exists');
   }
 
   const category = await Category.create({
-    company: new Types.ObjectId(companyId),
+    // Removed company field since we're removing company context
     name,
     description,
     subCategory,
@@ -149,12 +142,10 @@ export const createCategory = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const updateCategory = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const category = await Category.findOne({ _id: req.params.id, company: new Types.ObjectId(companyId) });
+  const categoryId = typeof req.params.id === 'string' ? req.params.id : '';
+  const category = await Category.findById(categoryId);
 
   if (!category) {
     throw ApiError.notFound('Category not found');
@@ -167,7 +158,8 @@ export const updateCategory = asyncHandler(async (req: Request, res: Response) =
   if (typeof subCategory === 'string') category.subCategory = subCategory;
 
   if (typeof isActive === 'boolean' && category.isActive && !isActive) {
-    await ensureNoLinkedItems(companyId.toString(), category._id);
+    // Cast category._id to Types.ObjectId to satisfy the function parameter type
+    await ensureNoLinkedItems(category._id as Types.ObjectId);
     category.isActive = false;
   } else if (typeof isActive === 'boolean') {
     category.isActive = isActive;
@@ -176,30 +168,25 @@ export const updateCategory = asyncHandler(async (req: Request, res: Response) =
   await category.save();
 
   const itemsCount = await Item.countDocuments({
-    company: new Types.ObjectId(companyId),
-    category: category._id,
+    category: category._id as Types.ObjectId,
     isActive: true
   });
 
   return respond(res, StatusCodes.OK, serializeCategory(category, itemsCount), { message: 'Category updated successfully' });
 });
-
 export const deleteCategory = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const category = await Category.findOne({ _id: req.params.id, company: new Types.ObjectId(companyId) });
+  const categoryId = typeof req.params.id === 'string' ? req.params.id : '';
+  const category = await Category.findById(categoryId);
 
   if (!category) {
     throw ApiError.notFound('Category not found');
   }
 
-  await ensureNoLinkedItems(companyId.toString(), category._id);
+  await ensureNoLinkedItems(category._id as Types.ObjectId);
 
-  category.isActive = false;
-  await category.save();
+  await Category.deleteOne({ _id: category._id as Types.ObjectId });
 
-  return respond(res, StatusCodes.OK, { success: true }, { message: 'Category deactivated successfully' });
+  return respond(res, StatusCodes.OK, { success: true }, { message: 'Category deleted successfully' });
 });

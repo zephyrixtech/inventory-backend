@@ -96,9 +96,9 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
-console.log(req.body, "body")
+  console.log(req.body, "body");
 
-  const user = await User.findOne({ email }).populate('role');
+  const user = await User.findOne({ email });
 
   if (!user || !user.isActive) {
     throw ApiError.unauthorized('Invalid email or password');
@@ -139,18 +139,25 @@ console.log(req.body, "body")
   user.lastLoginAt = new Date();
   await user.save();
 
-  let roleInfo = 'biller';
-  if (typeof user.role === 'string') {
-    roleInfo = user.role;
-  } else if (user.role && typeof user.role === 'object') {
-    roleInfo = (user.role as any).name || 'biller';
+  // Handle role properly based on the user model definition
+  const roleInfo = user.role || 'biller';
+
+  // Get role permissions if needed (for superadmin role, we might want to give all permissions)
+  let permissions: string[] = [];
+  if (user.role === 'superadmin') {
+    // Super admin gets all permissions
+    permissions = ['*'];
+  } else {
+    // For other roles, we would need to fetch permissions from the role model
+    // But since the user.role is a string, not a reference, we'll leave it empty for now
+    permissions = [];
   }
 
   const payload = buildTokenPayload({
     userId: user._id,
-    companyId: user.company,
-    roleId: typeof user.role === 'string' ? user.role : (user.role as any)._id ?? user.role,
-    permissions: (user.role as any)?.permissions
+    companyId: user._id, // Using user._id as companyId since we're removing company context
+    roleId: user._id, // Using user._id as roleId since role is a string, not a reference
+    permissions: permissions
   });
 
   const accessToken = generateAccessToken(payload);
@@ -162,7 +169,13 @@ console.log(req.body, "body")
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   });
 
-  const company = await Company.findById(user.company).lean();
+  // Get company info (using user._id as companyId since we're removing company context)
+  const company = {
+    id: user._id,
+    name: 'Default Company',
+    code: 'DEFAULT',
+    currency: 'USD'
+  };
 
   return respond(res, StatusCodes.OK, {
     accessToken,
@@ -173,16 +186,8 @@ console.log(req.body, "body")
       lastName: user.lastName,
       email: user.email,
       role: roleInfo, 
-      permissions: (user.role as any)?.permissions ?? [],
-      companyId: user.company.toString(),
-      company: company
-        ? {
-            id: company._id,
-            name: company.name,
-            code: company.code,
-            currency: company.currency
-          }
-        : null,
+      permissions: permissions,
+      company: company,
       status: user.status,
       isActive: user.isActive
     }
@@ -205,23 +210,29 @@ export const refresh = asyncHandler(async (req: Request, res: Response) => {
   try {
     const payload = verifyRefreshToken(refreshToken);
 
-    const user = await User.findById(payload.sub).populate('role');
+    const user = await User.findById(payload.sub);
     if (!user) {
       throw ApiError.unauthorized('User not found');
     }
 
-    let roleInfo = 'biller'; // default fallback
-    if (typeof user.role === 'string') {
-      roleInfo = user.role;
-    } else if (user.role && typeof user.role === 'object') {
-      roleInfo = (user.role as any).name || 'biller';
+    // Handle role properly based on the user model definition
+    const roleInfo = user.role || 'biller';
+
+    // Get role permissions if needed
+    let permissions: string[] = [];
+    if (user.role === 'superadmin') {
+      // Super admin gets all permissions
+      permissions = ['*'];
+    } else {
+      // For other roles, permissions would be fetched differently
+      permissions = [];
     }
 
     const newPayload = buildTokenPayload({
       userId: user._id,
-      companyId: user.company,
-      roleId: typeof user.role === 'string' ? user.role : (user.role as any)._id ?? user.role,
-      permissions: (user.role as any)?.permissions
+      companyId: user._id, // Using user._id as companyId since we're removing company context
+      roleId: user._id, // Using user._id as roleId since role is a string, not a reference
+      permissions: permissions
     });
 
     const accessToken = generateAccessToken(newPayload);
@@ -256,30 +267,41 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.unauthorized('Unauthorized');
   }
 
-  const user = await User.findById(req.user.id)
-    .populate('role', 'name permissions')
-    .populate('company', 'name code currency');
+  const user = await User.findById(req.user.id);
 
   if (!user) {
     throw ApiError.notFound('User not found');
   }
 
-  let roleInfo = 'biller'; 
-  if (typeof user.role === 'string') {
-    roleInfo = user.role;
-  } else if (user.role && typeof user.role === 'object') {
-    roleInfo = (user.role as any).name || 'biller';
+  // Handle role properly based on the user model definition
+  const roleInfo = user.role || 'biller';
+
+  // Get role permissions if needed
+  let permissions: string[] = [];
+  if (user.role === 'superadmin') {
+    // Super admin gets all permissions
+    permissions = ['*'];
+  } else {
+    // For other roles, permissions would be fetched differently
+    permissions = [];
   }
+
+  // Get company info (using user._id as companyId since we're removing company context)
+  const company = {
+    id: user._id,
+    name: 'Default Company',
+    code: 'DEFAULT',
+    currency: 'USD'
+  };
 
   return respond(res, StatusCodes.OK, {
     id: user._id,
     firstName: user.firstName,
     lastName: user.lastName,
     email: user.email,
-    role: roleInfo, // Send the processed role name
-    companyId: user.company._id,
-    company: user.company,
-    permissions: (user.role as any)?.permissions ?? []
+    role: roleInfo,
+    company: company,
+    permissions: permissions
   });
 });
 

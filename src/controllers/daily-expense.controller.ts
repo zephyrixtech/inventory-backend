@@ -10,15 +10,12 @@ import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
 
 export const listDailyExpenses = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
-
+  // Removed company context check since we're removing company context
   const { from, to, productId } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
-  const filters: Record<string, unknown> = { company: companyId };
+  // Removed company context - using empty filters object
+  const filters: Record<string, unknown> = {};
 
   if (productId) {
     filters.product = productId;
@@ -50,21 +47,22 @@ export const listDailyExpenses = asyncHandler(async (req: Request, res: Response
 });
 
 export const createDailyExpense = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId || !req.user) {
-    throw ApiError.badRequest('Company context missing');
+  // Removed company context check since we're removing company context
+  if (!req.user) {
+    throw ApiError.badRequest('User context missing');
   }
 
   const { productId, description, amount, date, type } = req.body;
 
-  const product = await Item.findOne({ _id: productId, company: companyId });
+  // Removed company filter since we're removing company context
+  const product = await Item.findById(productId);
 
   if (!product) {
     throw ApiError.notFound('Product not found');
   }
 
   const expense = await DailyExpense.create({
-    company: companyId,
+    // Removed company field since we're removing company context
     product: product._id,
     description,
     amount,
@@ -77,12 +75,10 @@ export const createDailyExpense = asyncHandler(async (req: Request, res: Respons
 });
 
 export const deleteDailyExpense = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const expense = await DailyExpense.findOne({ _id: req.params.id, company: companyId });
+  // Removed company filter since we're removing company context
+  const expense = await DailyExpense.findById(req.params.id);
 
   if (!expense) {
     throw ApiError.notFound('Expense not found');
@@ -92,4 +88,3 @@ export const deleteDailyExpense = asyncHandler(async (req: Request, res: Respons
 
   return respond(res, StatusCodes.OK, { success: true }, { message: 'Expense removed successfully' });
 });
-

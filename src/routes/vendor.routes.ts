@@ -3,7 +3,7 @@ import { body, param } from 'express-validator';
 
 import { authenticate, authorize } from '../middlewares/auth';
 import { validateRequest } from '../middlewares/validate-request';
-import { listVendors, getVendor, createVendor, updateVendor, deactivateVendor } from '../controllers/vendor.controller';
+import { listVendors, getVendor, createVendor, updateVendor, deleteVendor } from '../controllers/vendor.controller';
 
 const router = Router();
 
@@ -22,7 +22,7 @@ router.post(
 
 router.put('/:id', [param('id').isMongoId()], validateRequest, updateVendor);
 
-router.delete('/:id', [param('id').isMongoId()], validateRequest, deactivateVendor);
+router.delete('/:id', [param('id').isMongoId()], validateRequest, deleteVendor);
 
 export default router;
 

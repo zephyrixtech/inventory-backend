@@ -7,21 +7,15 @@ import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
 
 export const getCurrencyRates = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
-  const rates = await CurrencyRate.find({ company: companyId }).sort({ updatedAt: -1 });
+  const rates = await CurrencyRate.find({}).sort({ updatedAt: -1 });
 
   return respond(res, StatusCodes.OK, rates);
 });
 
 export const upsertCurrencyRate = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId || !req.user) {
-    throw ApiError.badRequest('Company context missing');
-  }
+  // Removed company context check since we're removing company context
 
   const { fromCurrency, toCurrency, rate } = req.body;
 
@@ -30,15 +24,14 @@ export const upsertCurrencyRate = asyncHandler(async (req: Request, res: Respons
   }
 
   const currencyRate = await CurrencyRate.findOneAndUpdate(
-    { company: companyId, fromCurrency, toCurrency },
+    { fromCurrency, toCurrency },
     {
       rate,
       effectiveDate: new Date(),
-      createdBy: req.user.id
+      createdBy: req.user?.id
     },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
   return respond(res, StatusCodes.OK, currencyRate, { message: 'Currency rate saved successfully' });
 });
-

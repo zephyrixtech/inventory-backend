@@ -14,19 +14,14 @@ import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
 
 export const getDashboardMetrics = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
-
-  const companyFilter = { company: companyId };
+  // Removed company context check since we're removing company context
 
   const [totalItems, inventoryRecords, purchaseOrders, salesInvoices, categories] = await Promise.all([
-    Item.countDocuments(companyFilter),
-    Inventory.find(companyFilter).populate('item'),
-    PurchaseOrder.find({ ...companyFilter, isActive: true }),
-    SalesInvoice.find(companyFilter),
-    Category.find({ ...companyFilter, isActive: true })
+    Item.countDocuments({}),
+    Inventory.find({}).populate('item'),
+    PurchaseOrder.find({ isActive: true }),
+    SalesInvoice.find({}),
+    Category.find({ isActive: true })
   ]);
 
   const totalValue = inventoryRecords.reduce((sum, record) => {
@@ -41,7 +36,7 @@ export const getDashboardMetrics = asyncHandler(async (req: Request, res: Respon
     const stock = inventoryRecords
       .filter((record) => {
         const itemDoc = record.item as { category?: Types.ObjectId } | null;
-        return Boolean(itemDoc?.category && itemDoc.category.toString() === category._id.toString());
+        return Boolean(itemDoc?.category && itemDoc.category === category._id);
       })
       .reduce((sum, record) => sum + record.quantity, 0);
 
