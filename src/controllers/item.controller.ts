@@ -175,6 +175,8 @@ export const createItem = asyncHandler(async (req: Request, res: Response) => {
     quantity,
     purchaseDate,
     status,
+    paidAmount,
+    returnAmount,
     additionalAttributes,
     videoType,
     youtubeLink,
@@ -193,7 +195,7 @@ export const createItem = asyncHandler(async (req: Request, res: Response) => {
 
   let vendorObjectId: Types.ObjectId | undefined;
   if (vendorId) {
-    const vendor = await Vendor.findOne({ _id: vendorId, company: companyId });
+    const vendor = await Supplier.findOne({ _id: vendorId, company: companyId }); // Changed from Vendor to Supplier
     if (!vendor) {
       throw ApiError.badRequest('Invalid vendor');
     }
@@ -224,6 +226,8 @@ export const createItem = asyncHandler(async (req: Request, res: Response) => {
     availableQuantity: quantity ?? 0,
     purchaseDate,
     status,
+    paidAmount: typeof paidAmount === 'number' ? paidAmount : undefined,
+    returnAmount: typeof returnAmount === 'number' ? returnAmount : undefined,
     additionalAttributes: sanitizedAdditionalAttributes,
     videoType: normalizedVideoType,
     youtubeLink: sanitizedYoutubeLink,
@@ -264,6 +268,8 @@ export const updateItem = asyncHandler(async (req: Request, res: Response) => {
     quantity,
     purchaseDate,
     status,
+    paidAmount,
+    returnAmount,
     additionalAttributes,
     videoType,
     youtubeLink,
@@ -283,6 +289,8 @@ export const updateItem = asyncHandler(async (req: Request, res: Response) => {
   if (currency) item.currency = currency;
   if (purchaseDate) item.purchaseDate = purchaseDate;
   if (status) item.status = status;
+  if (typeof paidAmount === 'number') item.paidAmount = paidAmount;
+  if (typeof returnAmount === 'number') item.returnAmount = returnAmount;
   if (categoryId) {
     const category = await Category.findOne({ _id: categoryId, company: companyId });
     if (!category) {
@@ -291,7 +299,7 @@ export const updateItem = asyncHandler(async (req: Request, res: Response) => {
     item.category = category._id;
   }
   if (vendorId) {
-    const vendor = await Vendor.findOne({ _id: vendorId, company: companyId });
+    const vendor = await Supplier.findOne({ _id: vendorId, company: companyId });
     if (!vendor) {
       throw ApiError.badRequest('Invalid vendor');
     }
