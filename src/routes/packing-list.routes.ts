@@ -3,7 +3,7 @@ import { body, param } from 'express-validator';
 
 import { authenticate, authorize } from '../middlewares/auth';
 import { validateRequest } from '../middlewares/validate-request';
-import { listPackingLists, createPackingList, updatePackingList } from '../controllers/packing-list.controller';
+import { listPackingLists, createPackingList, getPackingList, updatePackingList, deletePackingList } from '../controllers/packing-list.controller';
 
 const router = Router();
 
@@ -24,12 +24,16 @@ router.post(
   createPackingList
 );
 
+router.get('/:id', [param('id').isMongoId()], validateRequest, getPackingList);
+
 router.put(
   '/:id',
   [param('id').isMongoId(), body('items').optional().isArray(), body('items.*.productId').optional().isMongoId()],
   validateRequest,
   updatePackingList
 );
+
+router.delete('/:id', [param('id').isMongoId()], validateRequest, deletePackingList);
 
 export default router;
 

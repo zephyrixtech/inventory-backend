@@ -11,10 +11,15 @@ export interface PackingListDocument extends Document<Types.ObjectId> {
   boxNumber: string;
   items: PackingListItem[];
   totalQuantity: number;
-  image?: string;
+  image1?: string;
+  image2?: string;
   shipmentDate?: Date;
   packingDate?: Date;
-  status: 'pending' | 'approved' | 'shipped' | 'rejected';
+  store?: Types.ObjectId;
+  toStore?: Types.ObjectId;
+  currency?: 'INR' | 'AED';
+  exchangeRate?: number;
+  status: 'pending' | 'in_transit' | 'approved' | 'shipped' | 'rejected';
   createdBy: Types.ObjectId;
   approvedBy?: Types.ObjectId;
   approvedAt?: Date;
@@ -37,10 +42,15 @@ const packingListSchema = new Schema<PackingListDocument>(
     boxNumber: { type: String, required: true, trim: true },
     items: { type: [packingListItemSchema], default: [] },
     totalQuantity: { type: Number, default: 0, min: 0 },
-    image: { type: String },
+    image1: { type: String },
+    image2: { type: String },
     shipmentDate: { type: Date },
     packingDate: { type: Date },
-    status: { type: String, enum: ['pending', 'approved', 'shipped', 'rejected'], default: 'pending' },
+    store: { type: Schema.Types.ObjectId, ref: 'Store' },
+    toStore: { type: Schema.Types.ObjectId, ref: 'Store' },
+    currency: { type: String, enum: ['INR', 'AED'], default: 'INR' },
+    exchangeRate: { type: Number },
+    status: { type: String, enum: ['pending', 'in_transit', 'approved', 'shipped', 'rejected'], default: 'pending' },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     approvedAt: { type: Date }
@@ -58,4 +68,3 @@ packingListSchema.pre('save', function (next) {
 });
 
 export const PackingList = model<PackingListDocument>('PackingList', packingListSchema);
-
