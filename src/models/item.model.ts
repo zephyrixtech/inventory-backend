@@ -14,7 +14,7 @@ export interface ItemDocument extends Document {
   _id: Types.ObjectId;
   // Removed company field since we're removing company context
   name: string;
-  code: string;
+  code: string; // This will be auto-generated if not provided
   category: Types.ObjectId;
   description?: string;
   unitOfMeasure?: string;
@@ -34,6 +34,7 @@ export interface ItemDocument extends Document {
   // Payment tracking fields
   paidAmount?: number;
   returnAmount?: number;
+  balanceAmount?: number;
 
   // QC fields
   qcStatus?: 'pending' | 'approved' | 'rejected';
@@ -142,6 +143,10 @@ const itemSchema = new Schema<ItemDocument>(
       min: 0
     },
     returnAmount: {
+      type: Number,
+      min: 0
+    },
+    balanceAmount: {
       type: Number,
       min: 0
     },
