@@ -31,6 +31,10 @@ export interface ItemDocument extends Document {
   purchaseDate?: Date;
   status: ItemStatus;
 
+  // Payment tracking fields
+  paidAmount?: number;
+  returnAmount?: number;
+
   // QC fields
   qcStatus?: 'pending' | 'approved' | 'rejected';
   qcRemarks?: string;
@@ -83,7 +87,7 @@ const itemSchema = new Schema<ItemDocument>(
     },
     vendor: {
       type: Schema.Types.ObjectId,
-      ref: 'Vendor'
+      ref: 'Supplier'
     },
     unitPrice: {
       type: Number,
@@ -130,6 +134,16 @@ const itemSchema = new Schema<ItemDocument>(
         'archived'
       ],
       default: 'draft'
+    },
+
+    // Payment tracking fields
+    paidAmount: {
+      type: Number,
+      min: 0
+    },
+    returnAmount: {
+      type: Number,
+      min: 0
     },
 
     // QC fields

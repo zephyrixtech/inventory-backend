@@ -78,6 +78,8 @@ export const createItem = asyncHandler(async (req: Request, res: Response) => {
     quantity,
     purchaseDate,
     status,
+    paidAmount,
+    returnAmount,
     additionalAttributes,
     videoType,
     youtubeLink
@@ -92,7 +94,7 @@ export const createItem = asyncHandler(async (req: Request, res: Response) => {
   // Validate vendor if provided
   let vendor: VendorDocument | null = null;
   if (vendorId) {
-    vendor = await Vendor.findById(vendorId);
+    const vendor = await Supplier.findOne({ _id: vendorId, company: companyId }); // Changed from Vendor to Supplier
     if (!vendor) {
       throw ApiError.badRequest('Invalid vendor');
     }
@@ -117,16 +119,17 @@ export const createItem = asyncHandler(async (req: Request, res: Response) => {
     quantity,
     purchaseDate,
     status,
-    additionalAttributes,
-    videoType,
-    youtubeLink,
-    createdBy: req.user?.id ? new Types.ObjectId(req.user.id) : undefined
+    paidAmount: typeof paidAmount === 'number' ? paidAmount : undefined,
+    returnAmount: typeof returnAmount === 'number' ? returnAmount : undefined,
+    additionalAttributes: sanitizedAdditionalAttributes,
+    videoType: normalizedVideoType,
+    youtubeLink: sanitizedYoutubeLink,
+    videoUrl: sanitizedVideoUrl
   });
 
-  await item.populate('category', 'name');
-  await item.populate('vendor', 'name');
-
-  return respond(res, StatusCodes.CREATED, item, { message: 'Item created successfully' });
+  return respond(res, StatusCodes.CREATED, await item.populate('vendor', 'name contactPerson'), {
+    message: 'Item created successfully'
+  });
 });
 
 export const updateItem = asyncHandler(async (req: Request, res: Response) => {
@@ -150,13 +153,29 @@ export const updateItem = asyncHandler(async (req: Request, res: Response) => {
     quantity,
     purchaseDate,
     status,
+    paidAmount,
+    returnAmount,
     additionalAttributes,
     videoType,
     youtubeLink,
     isActive
   } = req.body;
 
-  // Validate category if provided
+  if (name) item.name = name;
+  if (description) item.description = description;
+  if (unitOfMeasure) item.unitOfMeasure = unitOfMeasure;
+  if (typeof isActive === 'boolean') item.isActive = isActive;
+  if (typeof unitPrice === 'number') item.unitPrice = unitPrice;
+  if (typeof quantity === 'number') {
+    item.quantity = quantity;
+    const damaged = item.damagedQuantity || 0;
+    item.availableQuantity = Math.max(0, quantity - damaged);
+  }
+  if (currency) item.currency = currency;
+  if (purchaseDate) item.purchaseDate = purchaseDate;
+  if (status) item.status = status;
+  if (typeof paidAmount === 'number') item.paidAmount = paidAmount;
+  if (typeof returnAmount === 'number') item.returnAmount = returnAmount;
   if (categoryId) {
     const category = await Category.findById(categoryId);
     if (!category) {
@@ -167,7 +186,7 @@ export const updateItem = asyncHandler(async (req: Request, res: Response) => {
 
   // Validate vendor if provided
   if (vendorId) {
-    const vendor: VendorDocument | null = await Vendor.findById(vendorId);
+    const vendor = await Supplier.findOne({ _id: vendorId, company: companyId });
     if (!vendor) {
       throw ApiError.badRequest('Invalid vendor');
     }
