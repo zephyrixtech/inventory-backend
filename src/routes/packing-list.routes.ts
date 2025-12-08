@@ -36,4 +36,3 @@ router.put(
 router.delete('/:id', [param('id').isMongoId()], validateRequest, deletePackingList);
 
 export default router;
-

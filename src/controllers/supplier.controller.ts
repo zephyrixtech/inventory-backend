@@ -9,13 +9,10 @@ import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
 
 export const listSuppliers = asyncHandler(async (req: Request, res: Response) => {
-  // Removed company context check since we're removing company context
-
   const { status, contact, search } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
   const filters: Record<string, unknown> = {};
-  // Removed company filter since we're removing company context
 
   if (status && status !== 'all') {
     filters.status = status;
@@ -28,7 +25,6 @@ export const listSuppliers = asyncHandler(async (req: Request, res: Response) =>
   if (search && typeof search === 'string') {
     filters.$or = [
       { name: new RegExp(search, 'i') },
-      { supplierId: new RegExp(search, 'i') },
       { email: new RegExp(search, 'i') }
     ];
   }
@@ -49,8 +45,6 @@ export const listSuppliers = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const getSupplier = asyncHandler(async (req: Request, res: Response) => {
-  // Removed company context check since we're removing company context
-
   const supplier = await Supplier.findById(req.params.id);
 
   if (!supplier) {
@@ -61,19 +55,14 @@ export const getSupplier = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const createSupplier = asyncHandler(async (req: Request, res: Response) => {
-  // Removed company context check since we're removing company context
-
   const { 
-    supplierId, 
     name, 
     email, 
     phone, 
     contactPerson, 
     status, 
     address, 
-    creditReport,
     registrationNumber,
-    taxId,
     website,
     city,
     state,
@@ -83,33 +72,18 @@ export const createSupplier = asyncHandler(async (req: Request, res: Response) =
     bank_account_number,
     ifscCode,
     ibanCode,
-    creditLimit,
-    paymentTerms,
     description,
-    rating,
-    notes,
-    selectedBrands,
-    selectedSupplies,
-    selectedSubcategories
+    rating
   } = req.body;
 
-  const existing = await Supplier.findOne({ supplierId });
-  if (existing) {
-    throw ApiError.conflict('Supplier with this ID already exists');
-  }
-
   const supplier = await Supplier.create({
-    // Removed company field since we're removing company context
-    supplierId,
     name,
     email,
     phone,
     contactPerson,
     status,
     address,
-    creditReport,
     registrationNumber,
-    taxId,
     website,
     city,
     state,
@@ -119,24 +93,15 @@ export const createSupplier = asyncHandler(async (req: Request, res: Response) =
     bank_account_number,
     ifscCode,
     ibanCode,
-    creditLimit,
-    paymentTerms,
     description,
     rating,
-    notes,
-    selectedBrands,
-    selectedSupplies,
-    selectedSubcategories,
     createdBy: req.user?.id
   });
-console.log(supplier,"supplier^^^^^^^^^^^^^");
 
   return respond(res, StatusCodes.CREATED, supplier, { message: 'Supplier created successfully' });
 });
 
 export const updateSupplier = asyncHandler(async (req: Request, res: Response) => {
-  // Removed company context check since we're removing company context
-
   const supplier = await Supplier.findById(req.params.id);
 
   if (!supplier) {
@@ -150,10 +115,8 @@ export const updateSupplier = asyncHandler(async (req: Request, res: Response) =
     contactPerson, 
     status, 
     address, 
-    creditReport, 
     isActive,
     registrationNumber,
-    taxId,
     website,
     city,
     state,
@@ -163,14 +126,8 @@ export const updateSupplier = asyncHandler(async (req: Request, res: Response) =
     bank_account_number,
     ifscCode,
     ibanCode,
-    creditLimit,
-    paymentTerms,
     description,
-    rating,
-    notes,
-    selectedBrands,
-    selectedSupplies,
-    selectedSubcategories
+    rating
   } = req.body;
 
   if (name !== undefined) supplier.name = name;
@@ -180,9 +137,7 @@ export const updateSupplier = asyncHandler(async (req: Request, res: Response) =
   if (status !== undefined) supplier.status = status;
   if (typeof isActive === 'boolean') supplier.isActive = isActive;
   if (address !== undefined) supplier.address = address;
-  if (creditReport !== undefined) supplier.creditReport = creditReport;
   if (registrationNumber !== undefined) supplier.registrationNumber = registrationNumber;
-  if (taxId !== undefined) supplier.taxId = taxId;
   if (website !== undefined) supplier.website = website;
   if (city !== undefined) supplier.city = city;
   if (state !== undefined) supplier.state = state;
@@ -192,14 +147,8 @@ export const updateSupplier = asyncHandler(async (req: Request, res: Response) =
   if (bank_account_number !== undefined) supplier.bank_account_number = bank_account_number;
   if (ifscCode !== undefined) supplier.ifscCode = ifscCode;
   if (ibanCode !== undefined) supplier.ibanCode = ibanCode;
-  if (creditLimit !== undefined) supplier.creditLimit = creditLimit;
-  if (paymentTerms !== undefined) supplier.paymentTerms = paymentTerms;
   if (description !== undefined) supplier.description = description;
   if (rating !== undefined) supplier.rating = rating;
-  if (notes !== undefined) supplier.notes = notes;
-  if (selectedBrands !== undefined) supplier.selectedBrands = selectedBrands;
-  if (selectedSupplies !== undefined) supplier.selectedSupplies = selectedSupplies;
-  if (selectedSubcategories !== undefined) supplier.selectedSubcategories = selectedSubcategories;
 
   await supplier.save();
 
@@ -207,8 +156,6 @@ export const updateSupplier = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const deleteSupplier = asyncHandler(async (req: Request, res: Response) => {
-  // Removed company context check since we're removing company context
-
   const supplier = await Supplier.findById(req.params.id);
 
   if (!supplier) {

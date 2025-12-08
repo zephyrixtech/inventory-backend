@@ -1,12 +1,14 @@
 import { Schema, model, type Document, type Types } from 'mongoose';
+import { Supplier } from './supplier.model';
 
 export interface DailyExpenseDocument extends Document<Types.ObjectId> {
-  company: Types.ObjectId;
-  product: Types.ObjectId;
+  supplier?: Types.ObjectId;
   description: string;
   amount: number;
   date: Date;
-  type: 'purchase' | 'petty' | 'sale';
+  type: 'purchase' | 'petty';
+  paymentType?: 'cash' | 'card' | 'upi';
+  transactionId?: string;
   createdBy: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -14,12 +16,13 @@ export interface DailyExpenseDocument extends Document<Types.ObjectId> {
 
 const dailyExpenseSchema = new Schema<DailyExpenseDocument>(
   {
-    company: { type: Schema.Types.ObjectId, ref: 'Company', required: true, index: true },
-    product: { type: Schema.Types.ObjectId, ref: 'Item', required: true },
+    supplier: { type: Schema.Types.ObjectId, ref: 'Supplier' },
     description: { type: String, required: true, trim: true },
     amount: { type: Number, required: true, min: 0 },
     date: { type: Date, default: Date.now },
-    type: { type: String, required: true, enum: ['purchase', 'petty', 'sale'] },
+    type: { type: String, required: true, enum: ['purchase', 'petty'] },
+    paymentType: { type: String, enum: ['cash', 'card', 'upi'] },
+    transactionId: { type: String, trim: true },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true }
   },
   {
@@ -27,7 +30,4 @@ const dailyExpenseSchema = new Schema<DailyExpenseDocument>(
   }
 );
 
-dailyExpenseSchema.index({ company: 1, date: 1 });
-
 export const DailyExpense = model<DailyExpenseDocument>('DailyExpense', dailyExpenseSchema);
-

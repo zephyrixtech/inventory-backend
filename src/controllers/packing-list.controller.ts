@@ -82,7 +82,7 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
     throw ApiError.badRequest('User context missing');
   }
 
-  const { location, boxNumber, items, shipmentDate, packingDate, image1, image2, storeId, toStoreId, currency, exchangeRate, status } = req.body;
+  const { location, boxNumber, items, shipmentDate, packingDate, image1, image2, storeId, toStoreId, currency, exchangeRate, status, cargoNumber, fabricDetails } = req.body;
 
   const existing = await PackingList.findOne({ boxNumber });
   if (existing) {
@@ -135,7 +135,10 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
     currency: currency || 'INR',
     exchangeRate,
     status: status || 'pending',
-    createdBy: new Types.ObjectId(req.user.id)
+    createdBy: new Types.ObjectId(req.user.id),
+    // New fields
+    cargoNumber,
+    fabricDetails
   });
 
   return respond(res, StatusCodes.CREATED, packingList, { message: 'Packing list created successfully' });
@@ -167,9 +170,9 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
     throw ApiError.notFound('Packing list not found');
   }
 
-  const { location, items, shipmentDate, packingDate, status, image1, image2, storeId, toStoreId, currency, exchangeRate } = req.body;
+  const { location, items, shipmentDate, packingDate, status, image1, image2, storeId, toStoreId, currency, exchangeRate, cargoNumber, fabricDetails } = req.body;
 
-  if (location) packingList.location = location;
+  // if (location) packingList.location = location;
   if (shipmentDate) packingList.shipmentDate = shipmentDate;
   if (packingDate) packingList.packingDate = packingDate;
   if (image1 !== undefined) packingList.image1 = image1;
@@ -177,6 +180,9 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
   if (toStoreId) packingList.toStore = new Types.ObjectId(toStoreId);
   if (currency) packingList.currency = currency;
   if (exchangeRate) packingList.exchangeRate = exchangeRate;
+  // New fields
+  if (cargoNumber !== undefined) packingList.cargoNumber = cargoNumber;
+  if (fabricDetails !== undefined) packingList.fabricDetails = fabricDetails;
 
   if (Array.isArray(items)) {
     const newItems = await normalizeItems(items);
