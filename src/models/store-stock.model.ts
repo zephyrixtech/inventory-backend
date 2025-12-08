@@ -1,7 +1,7 @@
 import { Schema, model, type Document, type Types } from 'mongoose';
 
 export interface StoreStockDocument extends Document<Types.ObjectId> {
-  company: Types.ObjectId;
+  company?: Types.ObjectId;
   product: Types.ObjectId;
   store?: Types.ObjectId;
   quantity: number;
@@ -15,7 +15,7 @@ export interface StoreStockDocument extends Document<Types.ObjectId> {
 
 const storeStockSchema = new Schema<StoreStockDocument>(
   {
-    company: { type: Schema.Types.ObjectId, ref: 'Company', required: true, index: true },
+    company: { type: Schema.Types.ObjectId, ref: 'Company', required: false, index: true },
     product: { type: Schema.Types.ObjectId, ref: 'Item', required: true },
     store: { type: Schema.Types.ObjectId, ref: 'Store', required: false },
     quantity: { type: Number, required: true, min: 0 },

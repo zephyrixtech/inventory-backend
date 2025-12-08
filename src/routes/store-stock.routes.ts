@@ -7,7 +7,8 @@ import { listStoreStock, upsertStoreStock, adjustStockQuantity } from '../contro
 
 const router = Router();
 
-// router.use(authenticate, authorize(['manage_store_stock']));
+// Use existing permissions instead of manage_store_stock
+router.use(authenticate, authorize(['manage_inventory']));
 
 router.get('/', listStoreStock);
 
@@ -21,4 +22,3 @@ router.post(
 router.put('/:id/quantity', [param('id').isMongoId(), body('quantity').isNumeric()], validateRequest, adjustStockQuantity);
 
 export default router;
-
