@@ -12,6 +12,7 @@ export interface CustomerDocument extends Document<Types.ObjectId> {
   taxNumber?: string;
   billingAddress?: string;
   shippingAddress?: string;
+  creditLimit: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -28,7 +29,8 @@ const customerSchema = new Schema<CustomerDocument>(
     isActive: { type: Boolean, default: true },
     taxNumber: { type: String, trim: true },
     billingAddress: { type: String, trim: true },
-    shippingAddress: { type: String, trim: true }
+    shippingAddress: { type: String, trim: true },
+    creditLimit: { type: Number, default: 0 }
   },
   {
     timestamps: true

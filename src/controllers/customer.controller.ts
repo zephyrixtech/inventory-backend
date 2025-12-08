@@ -59,7 +59,7 @@ export const getCustomer = asyncHandler(async (req: Request, res: Response) => {
 export const createCustomer = asyncHandler(async (req: Request, res: Response) => {
   // Removed company context check since we're removing company context
 
-  const { customerId, name, email, phone, contactPerson, status, taxNumber, billingAddress, shippingAddress } = req.body;
+  const { customerId, name, email, phone, contactPerson, status, taxNumber, billingAddress, shippingAddress, creditLimit } = req.body;
 
   const existing = await Customer.findOne({ customerId });
   if (existing) {
@@ -76,7 +76,8 @@ export const createCustomer = asyncHandler(async (req: Request, res: Response) =
     status,
     taxNumber,
     billingAddress,
-    shippingAddress
+    shippingAddress,
+    creditLimit
   });
 
   return respond(res, StatusCodes.CREATED, customer, { message: 'Customer created successfully' });
@@ -92,7 +93,7 @@ export const updateCustomer = asyncHandler(async (req: Request, res: Response) =
   }
 
   const updates: Record<string, unknown> = {};
-  const { customerId, name, email, phone, contactPerson, status, taxNumber, billingAddress, shippingAddress } = req.body;
+  const { customerId, name, email, phone, contactPerson, status, taxNumber, billingAddress, shippingAddress, creditLimit } = req.body;
 
   if (customerId !== undefined) updates.customerId = customerId;
   if (name !== undefined) updates.name = name;
@@ -103,6 +104,7 @@ export const updateCustomer = asyncHandler(async (req: Request, res: Response) =
   if (taxNumber !== undefined) updates.taxNumber = taxNumber;
   if (billingAddress !== undefined) updates.billingAddress = billingAddress;
   if (shippingAddress !== undefined) updates.shippingAddress = shippingAddress;
+  if (creditLimit !== undefined) updates.creditLimit = creditLimit;
 
   Object.assign(customer, updates);
   await customer.save();
