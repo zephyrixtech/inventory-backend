@@ -22,6 +22,9 @@ export interface PackingListDocument extends Document<Types.ObjectId> {
   createdBy: Types.ObjectId;
   approvedBy?: Types.ObjectId;
   approvedAt?: Date;
+  // New fields
+  cargoNumber?: string;
+  fabricDetails?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -51,7 +54,10 @@ const packingListSchema = new Schema<PackingListDocument>(
     status: { type: String, enum: ['pending', 'in_transit', 'approved', 'shipped', 'rejected'], default: 'pending' },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
-    approvedAt: { type: Date }
+    approvedAt: { type: Date },
+    // New fields
+    cargoNumber: { type: String, trim: true },
+    fabricDetails: { type: String, trim: true }
   },
   {
     timestamps: true
