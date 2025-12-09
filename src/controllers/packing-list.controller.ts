@@ -41,20 +41,19 @@ const normalizeItems = async (
 };
 
 export const listPackingLists = asyncHandler(async (req: Request, res: Response) => {
-  // Removed company context check since we're removing company context
 
   const { status, search } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
   const filters: Record<string, unknown> = {};
-  // Removed company filter since we're removing company context
 
   if (status && status !== 'all') {
     filters.status = status;
   }
 
+  // Removed location search since we're removing location field
   if (search && typeof search === 'string') {
-    filters.$or = [{ boxNumber: new RegExp(search, 'i') }, { location: new RegExp(search, 'i') }];
+    filters.$or = [{ boxNumber: new RegExp(search, 'i') }];
   }
 
   const query = PackingList.find(filters)
@@ -77,12 +76,12 @@ export const listPackingLists = asyncHandler(async (req: Request, res: Response)
 });
 
 export const createPackingList = asyncHandler(async (req: Request, res: Response) => {
-  // Removed company context check since we're removing company context
   if (!req.user) {
     throw ApiError.badRequest('User context missing');
   }
 
-  const { location, boxNumber, items, shipmentDate, packingDate, image1, image2, storeId, toStoreId, currency, exchangeRate, status, cargoNumber, fabricDetails } = req.body;
+  // Removed location field since we're removing location field
+  const { boxNumber, items, shipmentDate, packingDate, image1, image2, storeId, toStoreId, currency, exchangeRate, status, cargoNumber, fabricDetails } = req.body;
 
   const existing = await PackingList.findOne({ boxNumber });
   if (existing) {
@@ -122,8 +121,7 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
   }
 
   const packingList = await PackingList.create({
-    // Removed company field since we're removing company context
-    location,
+    // Removed location field since we're removing location field
     boxNumber,
     items: normalizedItems,
     shipmentDate,
@@ -145,7 +143,6 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
 });
 
 export const getPackingList = asyncHandler(async (req: Request, res: Response) => {
-  // Removed company context check since we're removing company context
 
   const packingList = await PackingList.findById(req.params.id)
     .populate('items.product', 'name code status')
@@ -162,7 +159,6 @@ export const getPackingList = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const updatePackingList = asyncHandler(async (req: Request, res: Response) => {
-  // Removed company context check since we're removing company context
 
   const packingList = await PackingList.findById(req.params.id);
 
@@ -170,9 +166,10 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
     throw ApiError.notFound('Packing list not found');
   }
 
-  const { location, items, shipmentDate, packingDate, status, image1, image2, storeId, toStoreId, currency, exchangeRate, cargoNumber, fabricDetails } = req.body;
+  // Removed location field since we're removing location field
+  const { items, shipmentDate, packingDate, status, image1, image2, storeId, toStoreId, currency, exchangeRate, cargoNumber, fabricDetails } = req.body;
 
-  // if (location) packingList.location = location;
+  // Removed location update since we're removing location field
   if (shipmentDate) packingList.shipmentDate = shipmentDate;
   if (packingDate) packingList.packingDate = packingDate;
   if (image1 !== undefined) packingList.image1 = image1;
@@ -271,25 +268,27 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
           store: packingList.toStore
         });
 
-        // Calculate the price based on currency and exchange rate
+        // Calculate the final price based on currency conversion if needed
         let finalPrice = product.unitPrice || 0;
-        let finalCurrency = packingList.currency || 'INR';
+        let finalCurrency = product.currency || 'INR';
 
-        if (packingList.currency === 'AED' && packingList.exchangeRate && product.unitPrice) {
-          // Convert price to AED using the exchange rate
-          finalPrice = product.unitPrice * packingList.exchangeRate;
+        if (packingList.currency === 'AED' && packingList.exchangeRate) {
+          finalPrice = finalPrice * packingList.exchangeRate;
+          finalCurrency = 'AED';
         }
 
         if (destStock) {
           // Update existing stock
           destStock.quantity += item.quantity;
-          destStock.currency = finalCurrency;
           destStock.priceAfterMargin = finalPrice;
-          destStock.lastUpdatedBy = new Types.ObjectId(req.user?.id);
+          destStock.currency = finalCurrency;
+          destStock.margin = 0; // Reset margin when moving stock
+          if (req.user) {
+            destStock.lastUpdatedBy = new Types.ObjectId(req.user.id);
+          }
         } else {
           // Create new stock entry
           destStock = new StoreStock({
-            // Removed company field since we're removing company context
             product: item.product,
             store: packingList.toStore,
             quantity: item.quantity,
@@ -326,11 +325,10 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
     .populate('approvedBy', 'firstName lastName')
     .populate('toStore', 'name code');
 
-  return respond(res, StatusCodes.OK, updatedPackingList, { message: 'Packing list updated successfully' });
+  return respond(res, StatusCodes.OK, updatedPackingList);
 });
 
 export const deletePackingList = asyncHandler(async (req: Request, res: Response) => {
-  // Removed company context check since we're removing company context
 
   const packingList = await PackingList.findById(req.params.id);
 

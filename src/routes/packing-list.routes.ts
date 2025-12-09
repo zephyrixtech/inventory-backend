@@ -7,14 +7,13 @@ import { listPackingLists, createPackingList, getPackingList, updatePackingList,
 
 const router = Router();
 
-// router.use(authenticate, authorize(['manage_packing']));
+router.use(authenticate, authorize(['manage_packing']));
 
 router.get('/', listPackingLists);
 
 router.post(
   '/',
   [
-    body('location').notEmpty(),
     body('boxNumber').notEmpty(),
     body('items').isArray({ min: 1 }),
     body('items.*.productId').isMongoId(),

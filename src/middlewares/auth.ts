@@ -9,9 +9,9 @@ import { verifyAccessToken } from '../services/token.service';
 
 const ROLE_PERMISSION_FALLBACK: Record<string, string[]> = {
   superadmin: ['*'],
-  admin: ['manage_users'],
-  purchaser: [],
-  biller: []
+  admin: ['manage_users', 'manage_inventory'],
+  purchaser: ['manage_purchases', 'manage_inventory'],
+  biller: ['manage_sales', 'manage_inventory']
 };
 
 const parseAuthHeader = (authorization?: string): string | null => {
