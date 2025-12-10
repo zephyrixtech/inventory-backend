@@ -10,15 +10,10 @@ import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
 
 export const listItemConfigurations = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
-
   const { search, controlType } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
-  const filters: Record<string, unknown> = { company: companyId, isActive: true };
+  const filters: Record<string, unknown> = { isActive: true };
 
   if (search && typeof search === 'string') {
     filters.$or = [
@@ -47,11 +42,6 @@ export const listItemConfigurations = asyncHandler(async (req: Request, res: Res
 });
 
 export const getItemConfiguration = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
-
   const itemConfigId = req.params.id;
   if (!Types.ObjectId.isValid(itemConfigId)) {
     throw ApiError.badRequest('Invalid item configuration ID format');
@@ -59,7 +49,6 @@ export const getItemConfiguration = asyncHandler(async (req: Request, res: Respo
 
   const itemConfig = await ItemConfigurator.findOne({ 
     _id: new Types.ObjectId(itemConfigId), 
-    company: companyId,
     isActive: true 
   });
 
@@ -71,11 +60,6 @@ export const getItemConfiguration = asyncHandler(async (req: Request, res: Respo
 });
 
 export const createItemConfiguration = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
-
   const { 
     name, 
     description, 
@@ -89,13 +73,12 @@ export const createItemConfiguration = asyncHandler(async (req: Request, res: Re
   } = req.body;
 
   // Check if sequence already exists
-  const existing = await ItemConfigurator.findOne({ company: companyId, sequence });
+  const existing = await ItemConfigurator.findOne({ sequence });
   if (existing) {
     throw ApiError.conflict(`Item configuration with sequence ${sequence} already exists`);
   }
 
   const itemConfig = await ItemConfigurator.create({
-    company: companyId,
     name,
     description,
     control_type,
@@ -118,11 +101,6 @@ export const createItemConfiguration = asyncHandler(async (req: Request, res: Re
 });
 
 export const createMultipleItemConfigurations = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
-
   const configurations = req.body;
 
   // Validate that all sequences are unique
@@ -134,7 +112,6 @@ export const createMultipleItemConfigurations = asyncHandler(async (req: Request
 
   // Check if any sequence already exists
   const existingSequences = await ItemConfigurator.find({ 
-    company: companyId, 
     sequence: { $in: sequences } 
   });
 
@@ -161,7 +138,6 @@ export const createMultipleItemConfigurations = asyncHandler(async (req: Request
     }
     
     const processedConfig: any = {
-      company: companyId,
       name: config.name,
       description: config.description,
       control_type: config.control_type,
@@ -195,11 +171,6 @@ export const createMultipleItemConfigurations = asyncHandler(async (req: Request
 });
 
 export const updateItemConfiguration = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
-
   const itemConfigId = req.params.id;
   if (!Types.ObjectId.isValid(itemConfigId)) {
     throw ApiError.badRequest('Invalid item configuration ID format');
@@ -207,7 +178,6 @@ export const updateItemConfiguration = asyncHandler(async (req: Request, res: Re
 
   const itemConfig = await ItemConfigurator.findOne({ 
     _id: new Types.ObjectId(itemConfigId), 
-    company: companyId,
     isActive: true 
   });
 
@@ -231,7 +201,6 @@ export const updateItemConfiguration = asyncHandler(async (req: Request, res: Re
   // If sequence is being updated, check if it already exists for another config
   if (sequence && sequence !== itemConfig.sequence) {
     const existing = await ItemConfigurator.findOne({ 
-      company: companyId, 
       sequence,
       _id: { $ne: itemConfig._id }
     });
@@ -285,19 +254,13 @@ export const updateItemConfiguration = asyncHandler(async (req: Request, res: Re
 });
 
 export const deleteItemConfiguration = asyncHandler(async (req: Request, res: Response) => {
-  const companyId = req.companyId;
-  if (!companyId) {
-    throw ApiError.badRequest('Company context missing');
-  }
-
   const itemConfigId = req.params.id;
   if (!Types.ObjectId.isValid(itemConfigId)) {
     throw ApiError.badRequest('Invalid item configuration ID format');
   }
 
   const itemConfig = await ItemConfigurator.findOne({ 
-    _id: new Types.ObjectId(itemConfigId), 
-    company: companyId 
+    _id: new Types.ObjectId(itemConfigId) 
   });
 
   if (!itemConfig) {
