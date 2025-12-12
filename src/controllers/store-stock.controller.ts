@@ -56,6 +56,15 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
 
   const { productId, storeId, quantity, margin, currency } = req.body;
 
+  // Validate required fields
+  if (!productId) {
+    throw ApiError.badRequest('Product ID is required');
+  }
+  
+  if (typeof quantity !== 'number' || quantity < 0) {
+    throw ApiError.badRequest('Quantity must be a non-negative number');
+  }
+
   // Removed company filter since we're removing company context
   const product = await Item.findById(productId);
 
@@ -75,7 +84,25 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
 
   const basePrice = product.unitPrice ?? 0;
   const marginPercentage = Number(margin ?? 0);
-  const priceAfterMargin = basePrice + (basePrice * marginPercentage) / 100;
+  
+  // Validate margin percentage
+  if (marginPercentage < 0) {
+    throw ApiError.badRequest('Margin percentage cannot be negative');
+  }
+  
+  // Validate base price
+  if (basePrice < 0) {
+    throw ApiError.badRequest('Product unit price cannot be negative');
+  }
+  
+  const finalUnitPrice = basePrice + (basePrice * marginPercentage) / 100;
+  
+  // Validate currency
+  const validCurrencies = ['INR', 'AED'];
+  const selectedCurrency = currency ?? product.currency ?? 'INR';
+  if (!validCurrencies.includes(selectedCurrency)) {
+    throw ApiError.badRequest('Currency must be either INR or AED');
+  }
 
   // Removed company filter since we're removing company context
   const stock = await StoreStock.findOneAndUpdate(
@@ -83,8 +110,8 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
     {
       quantity,
       margin: marginPercentage,
-      currency: currency ?? product.currency ?? 'INR',
-      priceAfterMargin,
+      currency: selectedCurrency,
+      unitPrice: finalUnitPrice,
       ...(storeId && { store: new Types.ObjectId(storeId) }),
       lastUpdatedBy: new Types.ObjectId(req.user.id)
     },

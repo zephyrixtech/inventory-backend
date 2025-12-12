@@ -42,13 +42,17 @@ const normalizeItems = async (
 
 export const listPackingLists = asyncHandler(async (req: Request, res: Response) => {
 
-  const { status, search } = req.query;
+  const { status, approvalStatus, search } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
   const filters: Record<string, unknown> = {};
 
   if (status && status !== 'all') {
     filters.status = status;
+  }
+
+  if (approvalStatus && approvalStatus !== 'all') {
+    filters.approvalStatus = approvalStatus;
   }
 
   // Removed location search since we're removing location field
@@ -81,7 +85,7 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
   }
 
   // Removed location field since we're removing location field
-  const { boxNumber, items, shipmentDate, packingDate, image1, image2, storeId, toStoreId, currency, exchangeRate, status, cargoNumber, fabricDetails } = req.body;
+  const { boxNumber, items, shipmentDate, packingDate, image1, image2, storeId, toStoreId, currency, exchangeRate, status, approvalStatus, cargoNumber, fabricDetails } = req.body;
 
   const existing = await PackingList.findOne({ boxNumber });
   if (existing) {
@@ -132,7 +136,8 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
     toStore: toStoreId ? new Types.ObjectId(toStoreId) : undefined,
     currency: currency || 'INR',
     exchangeRate,
-    status: status || 'pending',
+    status: status || 'india',
+    approvalStatus: approvalStatus || 'draft', // Default to draft
     createdBy: new Types.ObjectId(req.user.id),
     // New fields
     cargoNumber,
@@ -167,7 +172,7 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
   }
 
   // Removed location field since we're removing location field
-  const { items, shipmentDate, packingDate, status, image1, image2, storeId, toStoreId, currency, exchangeRate, cargoNumber, fabricDetails } = req.body;
+  const { items, shipmentDate, packingDate, status, approvalStatus, image1, image2, storeId, toStoreId, currency, exchangeRate, cargoNumber, fabricDetails } = req.body;
 
   // Removed location update since we're removing location field
   if (shipmentDate) packingList.shipmentDate = shipmentDate;
@@ -248,72 +253,23 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
     packingList.items = newItems;
   }
 
-  if (status && ['pending', 'in_transit', 'approved', 'shipped', 'rejected'].includes(status)) {
-    // Check if status is changing to approved
-    if (status === 'approved' && packingList.status !== 'approved') {
-      if (!packingList.toStore) {
-        throw ApiError.badRequest('Destination store (To Store) is required for approval');
-      }
-
-      // Move items to destination store
-      for (const item of packingList.items) {
-        // Get the product to retrieve its price
-        const product = await Item.findById(item.product);
-        if (!product) {
-          throw ApiError.badRequest(`Product not found: ${item.product}`);
-        }
-
-        let destStock = await StoreStock.findOne({
-          product: item.product,
-          store: packingList.toStore
-        });
-
-        // Calculate the final price based on currency conversion if needed
-        let finalPrice = product.unitPrice || 0;
-        let finalCurrency = product.currency || 'INR';
-
-        if (packingList.currency === 'AED' && packingList.exchangeRate) {
-          finalPrice = finalPrice * packingList.exchangeRate;
-          finalCurrency = 'AED';
-        }
-
-        if (destStock) {
-          // Update existing stock
-          destStock.quantity += item.quantity;
-          destStock.priceAfterMargin = finalPrice;
-          destStock.currency = finalCurrency;
-          destStock.margin = 0; // Reset margin when moving stock
-          if (req.user) {
-            destStock.lastUpdatedBy = new Types.ObjectId(req.user.id);
-          }
-        } else {
-          // Create new stock entry
-          destStock = new StoreStock({
-            product: item.product,
-            store: packingList.toStore,
-            quantity: item.quantity,
-            currency: finalCurrency,
-            priceAfterMargin: finalPrice,
-            margin: 0,
-            lastUpdatedBy: new Types.ObjectId(req.user?.id)
-          });
-        }
-        await destStock.save();
-
-        // Also update the Item's currency and price if converting to AED
-        if (packingList.currency === 'AED' && packingList.exchangeRate && product.unitPrice) {
-          product.currency = 'AED';
-          product.unitPrice = finalPrice;
-          await product.save();
-        }
+  // Handle approval status changes
+  if (approvalStatus && ['draft', 'approved'].includes(approvalStatus)) {
+    // Check if approval status is changing to approved
+    if (approvalStatus === 'approved' && packingList.approvalStatus !== 'approved') {
+      // Set approval metadata
+      if (req.user) {
+        packingList.approvedBy = new Types.ObjectId(req.user.id);
+        packingList.approvedAt = new Date();
       }
     }
 
+    packingList.approvalStatus = approvalStatus;
+  }
+
+  // Handle regular status changes (separate from approval workflow)
+  if (status && ['pending', 'in_transit', 'approved', 'shipped', 'rejected', 'india', 'uae'].includes(status)) {
     packingList.status = status;
-    if (['approved', 'shipped'].includes(status) && req.user) {
-      packingList.approvedBy = new Types.ObjectId(req.user.id);
-      packingList.approvedAt = new Date();
-    }
   }
 
   await packingList.save();
@@ -328,6 +284,38 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
   return respond(res, StatusCodes.OK, updatedPackingList);
 });
 
+export const approvePackingList = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw ApiError.badRequest('User context missing');
+  }
+
+  const packingList = await PackingList.findById(req.params.id);
+
+  if (!packingList) {
+    throw ApiError.notFound('Packing list not found');
+  }
+
+  if (packingList.approvalStatus === 'approved') {
+    throw ApiError.badRequest('Packing list is already approved');
+  }
+
+  // Update approval status
+  packingList.approvalStatus = 'approved';
+  packingList.approvedBy = new Types.ObjectId(req.user.id);
+  packingList.approvedAt = new Date();
+  await packingList.save();
+
+  // Populate the response with product information
+  const updatedPackingList = await PackingList.findById(packingList._id)
+    .populate('items.product', 'name code status')
+    .populate('createdBy', 'firstName lastName')
+    .populate('approvedBy', 'firstName lastName')
+    .populate('store', 'name code')
+    .populate('toStore', 'name code');
+
+  return respond(res, StatusCodes.OK, updatedPackingList, { message: 'Packing list approved successfully' });
+});
+
 export const deletePackingList = asyncHandler(async (req: Request, res: Response) => {
 
   const packingList = await PackingList.findById(req.params.id);
@@ -336,11 +324,30 @@ export const deletePackingList = asyncHandler(async (req: Request, res: Response
     throw ApiError.notFound('Packing list not found');
   }
 
-  // Restore store stock quantities when deleting
-  // Note: This assumes we can identify the store from the packing list
-  // If storeId is not stored in packing list, we may need to track it differently
-  // For now, we'll just delete the packing list
+  // Only allow deletion of draft packing lists
+  if (packingList.approvalStatus === 'approved') {
+    throw ApiError.badRequest('Cannot delete approved packing lists');
+  }
+
+  // Restore store stock quantities when deleting (add back to source store)
+  if (packingList.store) {
+    for (const item of packingList.items) {
+      const stock = await StoreStock.findOne({
+        product: item.product,
+        store: packingList.store
+      });
+
+      if (stock) {
+        stock.quantity += item.quantity;
+        if (req.user) {
+          stock.lastUpdatedBy = new Types.ObjectId(req.user.id);
+        }
+        await stock.save();
+      }
+    }
+  }
+
   await packingList.deleteOne();
 
-  return respond(res, StatusCodes.OK, { success: true }, { message: 'Packing list deleted successfully' });
+  return respond(res, StatusCodes.OK, { success: true }, { message: 'Packing list deleted successfully and stock restored' });
 });

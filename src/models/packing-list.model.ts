@@ -6,7 +6,7 @@ export interface PackingListItem {
 }
 
 export interface PackingListDocument extends Document<Types.ObjectId> {
-  company: Types.ObjectId;
+  company?: Types.ObjectId;
   boxNumber: string;
   items: PackingListItem[];
   totalQuantity: number;
@@ -18,7 +18,8 @@ export interface PackingListDocument extends Document<Types.ObjectId> {
   toStore?: Types.ObjectId;
   currency?: 'INR' | 'AED';
   exchangeRate?: number;
-  status: 'pending' | 'in_transit' | 'approved' | 'shipped' | 'rejected';
+  status: 'pending' | 'in_transit' | 'approved' | 'shipped' | 'rejected' | 'india' | 'uae';
+  approvalStatus: 'draft' | 'approved'; // New approval workflow field
   createdBy: Types.ObjectId;
   approvedBy?: Types.ObjectId;
   approvedAt?: Date;
@@ -39,7 +40,7 @@ const packingListItemSchema = new Schema<PackingListItem>(
 
 const packingListSchema = new Schema<PackingListDocument>(
   {
-    company: { type: Schema.Types.ObjectId, ref: 'Company', required: true, index: true },
+    company: { type: Schema.Types.ObjectId, ref: 'Company', index: true },
     boxNumber: { type: String, required: true, trim: true },
     items: { type: [packingListItemSchema], default: [] },
     totalQuantity: { type: Number, default: 0, min: 0 },
@@ -51,7 +52,8 @@ const packingListSchema = new Schema<PackingListDocument>(
     toStore: { type: Schema.Types.ObjectId, ref: 'Store' },
     currency: { type: String, enum: ['INR', 'AED'], default: 'INR' },
     exchangeRate: { type: Number },
-    status: { type: String, enum: ['pending', 'in_transit', 'approved', 'shipped', 'rejected'], default: 'pending' },
+    status: { type: String, enum: ['pending', 'in_transit', 'approved', 'shipped', 'rejected', 'india', 'uae'], default: 'india' },
+    approvalStatus: { type: String, enum: ['draft', 'approved'], default: 'draft' }, // New approval workflow field
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     approvedAt: { type: Date },
@@ -64,7 +66,7 @@ const packingListSchema = new Schema<PackingListDocument>(
   }
 );
 
-packingListSchema.index({ company: 1, boxNumber: 1 }, { unique: true });
+packingListSchema.index({ boxNumber: 1 }, { unique: true });
 
 packingListSchema.pre('save', function (next) {
   this.totalQuantity = this.items.reduce((sum, item) => sum + (item.quantity || 0), 0);

@@ -4,6 +4,8 @@ import { StatusCodes } from 'http-status-codes';
 import { QualityCheck } from '../models/quality-check.model';
 import { Item } from '../models/item.model';
 import { User } from '../models/user.model';
+import { Store } from '../models/store.model';
+import { StoreStock } from '../models/store-stock.model';
 import { ApiError } from '../utils/api-error';
 import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
@@ -83,6 +85,56 @@ export const submitQualityCheck = asyncHandler(async (req: Request, res: Respons
   product.status = status === 'approved' ? 'store_pending' : status === 'rejected' ? 'qc_failed' : 'pending_qc';
 
   await product.save();
+
+  // Auto-create store stock entries for approved items in purchaser stores
+  if (status === 'approved') {
+    try {
+      // Find all stores with purchaser role
+      const purchaserStores = await Store.find({ 
+        purchaser: 'ROLE_PURCHASER',
+        isActive: true 
+      });
+
+      // Create store stock entries for each purchaser store
+      for (const store of purchaserStores) {
+        // Check if store stock already exists for this product and store
+        const existingStock = await StoreStock.findOne({
+          product: product._id,
+          store: store._id
+        });
+
+        if (!existingStock) {
+          // Calculate available quantity (total - damaged)
+          const availableQuantity = Math.max(0, (product.quantity || 0) - (sanitizedDamagedQuantity || 0));
+          
+          if (availableQuantity > 0) {
+            // Create new store stock entry
+            await StoreStock.create({
+              product: product._id,
+              store: store._id,
+              quantity: availableQuantity,
+              margin: 0, // Default margin
+              currency: product.currency || 'INR',
+              unitPrice: product.unitPrice || 0,
+              lastUpdatedBy: req.user.id
+            });
+          }
+        } else {
+          // Update existing stock quantity
+          const availableQuantity = Math.max(0, (product.quantity || 0) - (sanitizedDamagedQuantity || 0));
+          if (availableQuantity > 0) {
+            existingStock.quantity += availableQuantity;
+            existingStock.lastUpdatedBy = req.user.id as any;
+            await existingStock.save();
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to auto-create store stock entries:', error);
+      // Don't fail the QC process if store stock creation fails
+      // Just log the error and continue
+    }
+  }
 
   return respond(res, StatusCodes.OK, qcRecord, { message: 'Quality check submitted successfully' });
 });
