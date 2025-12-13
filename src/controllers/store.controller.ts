@@ -130,20 +130,32 @@ export const listStores = asyncHandler(async (req: Request, res: Response) => {
 
   // If user is purchaser or biller, only show stores where their role is assigned
   if (userId && userRole) {
-    if (userRole === 'purchaser') {
+    // Get the user to verify their role
+    const user = await User.findById(userId);
+    if (!user) {
+      throw ApiError.notFound('User not found');
+    }
+
+    // Verify the user actually has the role they claim
+    if (user.role !== userRole && !['admin', 'superadmin'].includes(user.role)) {
+      throw ApiError.forbidden('User does not have the specified role');
+    }
+
+    // Apply role-based filtering
+    if (userRole === 'purchaser' && user.role === 'purchaser') {
       // Show stores where the purchaser role is assigned
       queryConditions.$or = [
         { purchaser: 'ROLE_PURCHASER' },
         { manager: 'ROLE_MANAGER' }
       ];
-    } else if (userRole === 'biller') {
+    } else if (userRole === 'biller' && user.role === 'biller') {
       // Show stores where the biller role is assigned
       queryConditions.$or = [
         { biller: 'ROLE_BILLER' },
         { manager: 'ROLE_MANAGER' }
       ];
     }
-    // For admin and superadmin, show all stores (no additional filtering)
+    // For admin and superadmin, show all stores (no additional filtering applied)
   }
 
   const stores = await Store.find(queryConditions)
