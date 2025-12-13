@@ -4,13 +4,11 @@ import bcrypt from 'bcryptjs';
 import { connectDatabase } from '../config/database';
 import { config } from '../config/env';
 import { logger } from '../utils/logger';
-import { Company } from '../models/company.model';
 import { Role } from '../models/role.model';
 import { User } from '../models/user.model';
 
 const SUPERADMIN_EMAIL = 'superadmin@gmail.com';
 const SUPERADMIN_PASSWORD = 'superadmin123';
-const SUPERADMIN_COMPANY_CODE = 'DEV-HUB';
 
 const seed = async () => {
   await connectDatabase();
@@ -19,31 +17,11 @@ const seed = async () => {
   session.startTransaction();
 
   try {
-    let company = await Company.findOne({ code: SUPERADMIN_COMPANY_CODE }).session(session);
-    if (!company) {
-      company = await Company.create(
-        [
-          {
-            name: 'Developer Hub',
-            code: SUPERADMIN_COMPANY_CODE,
-            currency: 'INR'
-          }
-        ],
-        { session }
-      ).then((docs) => docs[0]);
-      logger.info('Created developer company for superadmin');
-    }
-
-    if (!company) {
-      throw new Error('Failed to initialize company for super admin seeding');
-    }
-
-    let role = await Role.findOne({ company: company._id, name: 'Super Admin' }).session(session);
+    let role = await Role.findOne({ name: 'Super Admin' }).session(session);
     if (!role) {
       role = await Role.create(
         [
           {
-            company: company._id,
             name: 'Super Admin',
             description: 'Developer-only role with full access',
             permissions: ['*'],
@@ -69,7 +47,6 @@ const seed = async () => {
       user = await User.create(
         [
           {
-            company: company._id,
             firstName: 'Super',
             lastName: 'Admin',
             email: SUPERADMIN_EMAIL,
@@ -85,7 +62,6 @@ const seed = async () => {
     } else {
       user.firstName = 'Super';
       user.lastName = 'Admin';
-      user.company = company._id;
       user.role = 'superadmin';
       user.status = 'active';
       user.isActive = true;
