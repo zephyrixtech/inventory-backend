@@ -25,12 +25,18 @@ export const getDashboardMetrics = asyncHandler(async (req: Request, res: Respon
   ]);
 
   const totalValue = inventoryRecords.reduce((sum, record) => {
-    const price = record.sellingPrice ?? record.unitPrice ?? 0;
-    return sum + record.quantity * price;
+    const item = record.item as any;
+    if (!item) return sum;
+    
+    const price = item.unitPrice ?? record.sellingPrice ?? record.unitPrice ?? 0;
+    return sum + (record.quantity * price);
   }, 0);
 
   const totalPurchaseOrders = purchaseOrders.length;
   const totalPurchaseOrderValue = purchaseOrders.reduce((sum, po) => sum + (po.totalValue ?? 0), 0);
+
+  const totalSalesInvoices = salesInvoices.length;
+  const totalSalesInvoiceValue = salesInvoices.reduce((sum, invoice) => sum + (invoice.netAmount ?? 0), 0);
 
   const categoryData = categories.map((category, index) => {
     const stock = inventoryRecords
@@ -108,14 +114,16 @@ export const getDashboardMetrics = asyncHandler(async (req: Request, res: Respon
 
       return null;
     })
-    .filter(Boolean);
+    .filter(Boolean) as any[];
 
   return respond(res, StatusCodes.OK, {
     metrics: {
       totalItems,
       totalValue,
       totalPurchaseOrders,
-      totalPurchaseOrderValue
+      totalPurchaseOrderValue,
+      totalSalesInvoices, // Added this new metric
+      totalSalesInvoiceValue // Added this new metric
     },
     categoryData,
     salesData,
@@ -124,4 +132,3 @@ export const getDashboardMetrics = asyncHandler(async (req: Request, res: Respon
     inventoryAlerts
   });
 });
-
