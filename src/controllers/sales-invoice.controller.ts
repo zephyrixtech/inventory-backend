@@ -50,7 +50,7 @@ const normalizeInvoiceItems = async (
       description: entry.description ?? item.name,
       quantity: entry.quantity,
       unitPrice: entry.unitPrice,
-      discount: discountAmount, 
+      discount: discountAmount,
       totalPrice
     });
   }
@@ -86,8 +86,9 @@ export const listSalesInvoices = asyncHandler(async (req: Request, res: Response
   }
 
   const query = SalesInvoice.find(filters)
-    .populate('customer', 'name customerId')
-    .populate('store', 'name code');
+    .populate('customer', 'name customerId email phone billingAddress')
+    .populate('store', 'name code')
+    .populate('items.item', 'name code description');
 
   if (sortBy) {
     query.sort({ [sortBy]: sortOrder === 'asc' ? 1 : -1 });
@@ -212,7 +213,7 @@ export const updateSalesInvoice = asyncHandler(async (req: Request, res: Respons
   if (Array.isArray(items)) {
     // Removed company parameter since we're removing company context
     const normalizedItems = await normalizeInvoiceItems(items);
-    
+
     // Get the store ID from the invoice
     const storeId = invoice.store.toString();
 
@@ -301,7 +302,7 @@ export const deleteSalesInvoice = asyncHandler(async (req: Request, res: Respons
 
   // Restore stock quantities when invoice is deleted
   const storeId = invoice.store.toString();
-  
+
   for (const item of invoice.items) {
     const stock = await StoreStock.findOne({
       product: item.item,
