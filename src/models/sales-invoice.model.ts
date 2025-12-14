@@ -10,7 +10,7 @@ export interface SalesInvoiceItem {
 }
 
 export interface SalesInvoiceDocument extends Document<Types.ObjectId> {
-  company: Types.ObjectId;
+  company?: Types.ObjectId;
   invoiceNumber: string;
   invoiceDate: Date;
   customer: Types.ObjectId;
@@ -20,7 +20,7 @@ export interface SalesInvoiceDocument extends Document<Types.ObjectId> {
   netAmount: number;
   taxAmount: number;
   notes?: string;
-  createdBy: Types.ObjectId;
+  createdBy?: Types.ObjectId;
   items: SalesInvoiceItem[];
   createdAt: Date;
   updatedAt: Date;
@@ -40,8 +40,8 @@ const salesInvoiceItemSchema = new Schema<SalesInvoiceItem>(
 
 const salesInvoiceSchema = new Schema<SalesInvoiceDocument>(
   {
-    company: { type: Schema.Types.ObjectId, ref: 'Company', required: true, index: true },
-    invoiceNumber: { type: String, required: true, trim: true },
+    company: { type: Schema.Types.ObjectId, ref: 'Company', required: false, index: true },
+    invoiceNumber: { type: String, required: true, trim: true, unique: true },
     invoiceDate: { type: Date, default: Date.now },
     customer: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
     store: { type: Schema.Types.ObjectId, ref: 'Store', required: true },
@@ -50,7 +50,7 @@ const salesInvoiceSchema = new Schema<SalesInvoiceDocument>(
     netAmount: { type: Number, required: true, min: 0 },
     taxAmount: { type: Number, default: 0, min: 0 },
     notes: { type: String, trim: true },
-    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     items: { type: [salesInvoiceItemSchema], default: [] }
   },
   {
@@ -58,7 +58,8 @@ const salesInvoiceSchema = new Schema<SalesInvoiceDocument>(
   }
 );
 
-salesInvoiceSchema.index({ company: 1, invoiceNumber: 1 }, { unique: true });
+// Unique index on invoiceNumber only (removed company from index)
+salesInvoiceSchema.index({ invoiceNumber: 1 }, { unique: true });
 
 export const SalesInvoice = model<SalesInvoiceDocument>('SalesInvoice', salesInvoiceSchema);
 

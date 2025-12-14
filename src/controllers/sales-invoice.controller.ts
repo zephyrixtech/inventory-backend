@@ -6,6 +6,7 @@ import { SalesInvoice } from '../models/sales-invoice.model';
 import { Customer } from '../models/customer.model';
 import { Store } from '../models/store.model';
 import { Item } from '../models/item.model';
+import { StoreStock } from '../models/store-stock.model';
 import { ApiError } from '../utils/api-error';
 import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
@@ -149,6 +150,31 @@ export const createSalesInvoice = asyncHandler(async (req: Request, res: Respons
   const discountTotal = normalizedItems.reduce((sum, item) => sum + (item.discount ?? 0), 0);
   const netAmount = subTotal - discountTotal + taxAmount;
 
+  // Check stock availability and reduce stock quantities
+  for (const item of normalizedItems) {
+    const stock = await StoreStock.findOne({
+      product: item.item,
+      store: new Types.ObjectId(storeId)
+    });
+
+    if (!stock) {
+      throw ApiError.badRequest(`Stock not found for item in selected store`);
+    }
+
+    if (stock.quantity < item.quantity) {
+      throw ApiError.badRequest(
+        `Insufficient stock for item. Available: ${stock.quantity}, Requested: ${item.quantity}`
+      );
+    }
+
+    // Reduce stock quantity
+    stock.quantity -= item.quantity;
+    if (req.user) {
+      stock.lastUpdatedBy = new Types.ObjectId(req.user.id);
+    }
+    await stock.save();
+  }
+
   const invoice = await SalesInvoice.create({
     // Removed company field since we're removing company context
     invoiceNumber,
@@ -186,6 +212,70 @@ export const updateSalesInvoice = asyncHandler(async (req: Request, res: Respons
   if (Array.isArray(items)) {
     // Removed company parameter since we're removing company context
     const normalizedItems = await normalizeInvoiceItems(items);
+    
+    // Get the store ID from the invoice
+    const storeId = invoice.store.toString();
+
+    // Create a map of old items for easy lookup
+    const oldItemsMap = new Map<string, number>();
+    invoice.items.forEach((item) => {
+      oldItemsMap.set(item.item.toString(), item.quantity);
+    });
+
+    // Process stock adjustments for updated items
+    const processedProductIds = new Set<string>();
+
+    for (const newItem of normalizedItems) {
+      const productId = newItem.item.toString();
+      processedProductIds.add(productId);
+      const oldQty = oldItemsMap.get(productId) || 0;
+      const diff = newItem.quantity - oldQty;
+
+      if (diff !== 0) {
+        const stock = await StoreStock.findOne({
+          product: newItem.item,
+          store: new Types.ObjectId(storeId)
+        });
+
+        if (!stock) {
+          throw ApiError.badRequest(`Stock not found for item in selected store`);
+        }
+
+        // If diff > 0, we are selling more (decreasing stock)
+        // If diff < 0, we are selling less (increasing stock - restoring)
+        if (diff > 0 && stock.quantity < diff) {
+          throw ApiError.badRequest(
+            `Insufficient stock for item. Available: ${stock.quantity}, Additional Needed: ${diff}`
+          );
+        }
+
+        stock.quantity -= diff;
+        if (req.user) {
+          stock.lastUpdatedBy = new Types.ObjectId(req.user.id);
+        }
+        await stock.save();
+      }
+    }
+
+    // Handle removed items (add quantity back to stock)
+    for (const [productId, oldQty] of oldItemsMap.entries()) {
+      if (!processedProductIds.has(productId)) {
+        // Item was removed from invoice, restore stock
+        const stock = await StoreStock.findOne({
+          product: new Types.ObjectId(productId),
+          store: new Types.ObjectId(storeId)
+        });
+
+        if (stock) {
+          stock.quantity += oldQty;
+          if (req.user) {
+            stock.lastUpdatedBy = new Types.ObjectId(req.user.id);
+          }
+          await stock.save();
+        }
+      }
+    }
+
     const subTotal = normalizedItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
     const discountTotal = normalizedItems.reduce((sum, item) => sum + (item.discount ?? 0), 0);
     invoice.items = normalizedItems;
@@ -207,6 +297,25 @@ export const deleteSalesInvoice = asyncHandler(async (req: Request, res: Respons
 
   if (!invoice) {
     throw ApiError.notFound('Sales invoice not found');
+  }
+
+  // Restore stock quantities when invoice is deleted
+  const storeId = invoice.store.toString();
+  
+  for (const item of invoice.items) {
+    const stock = await StoreStock.findOne({
+      product: item.item,
+      store: new Types.ObjectId(storeId)
+    });
+
+    if (stock) {
+      // Restore the quantity that was sold
+      stock.quantity += item.quantity;
+      if (req.user) {
+        stock.lastUpdatedBy = new Types.ObjectId(req.user.id);
+      }
+      await stock.save();
+    }
   }
 
   await invoice.deleteOne();
