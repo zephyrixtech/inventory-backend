@@ -12,6 +12,10 @@ export interface StoreStockDocument extends Document<Types.ObjectId> {
   createdAt: Date;
   lastUpdatedBy?: Types.ObjectId;
   unitPriceAED: number;
+  packingList?: Types.ObjectId;
+  dpPrice?: number;
+  exchangeRate?: number;
+  finalPrice?: number;
 }
 
 const storeStockSchema = new Schema<StoreStockDocument>(
@@ -24,14 +28,18 @@ const storeStockSchema = new Schema<StoreStockDocument>(
     currency: { type: String, enum: ['INR', 'AED'], default: 'INR' },
     unitPrice: { type: Number, default: 0, min: 0 },
     lastUpdatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
-    unitPriceAED: {type: Number, default: 0, min: 0 },
+    unitPriceAED: { type: Number, default: 0, min: 0 },
+    packingList: { type: Schema.Types.ObjectId, ref: 'PackingList' },
+    dpPrice: { type: Number },
+    exchangeRate: { type: Number },
+    finalPrice: { type: Number },
   },
   {
     timestamps: true
   }
 );
 
-storeStockSchema.index({ company: 1, store: 1 }, { unique: true });
+storeStockSchema.index({ company: 1, store: 1, product: 1 }, { unique: true });
 
 export const StoreStock = model<StoreStockDocument>('StoreStock', storeStockSchema);
 

@@ -54,13 +54,13 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
     throw ApiError.badRequest('User context missing');
   }
 
-  const { productId, storeId, quantity, margin, currency } = req.body;
+  const { productId, storeId, quantity, margin, currency, packingListId, dpPrice, finalPrice, exchangeRate, unitPrice } = req.body;
 
   // Validate required fields
   if (!productId) {
     throw ApiError.badRequest('Product ID is required');
   }
-  
+
   if (typeof quantity !== 'number' || quantity < 0) {
     throw ApiError.badRequest('Quantity must be a non-negative number');
   }
@@ -84,19 +84,19 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
 
   const basePrice = product.unitPrice ?? 0;
   const marginPercentage = Number(margin ?? 0);
-  
+
   // Validate margin percentage
   if (marginPercentage < 0) {
     throw ApiError.badRequest('Margin percentage cannot be negative');
   }
-  
+
   // Validate base price
   if (basePrice < 0) {
     throw ApiError.badRequest('Product unit price cannot be negative');
   }
-  
+
   const finalUnitPrice = basePrice + (basePrice * marginPercentage) / 100;
-  
+
   // Validate currency
   const validCurrencies = ['INR', 'AED'];
   const selectedCurrency = currency ?? product.currency ?? 'INR';
@@ -104,19 +104,45 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
     throw ApiError.badRequest('Currency must be either INR or AED');
   }
 
-  // Removed company filter since we're removing company context
-  const stock = await StoreStock.findOneAndUpdate(
-    { product: product._id, store: storeId ? new Types.ObjectId(storeId) : null },
-    {
+  // Check if stock exists
+  let stock = await StoreStock.findOne({
+    product: product._id,
+    store: storeId ? new Types.ObjectId(storeId) : null
+  });
+
+  if (stock) {
+    // If exists, increment quantity and update other fields
+    stock.quantity += quantity;
+    stock.margin = marginPercentage;
+    stock.currency = selectedCurrency;
+    stock.unitPrice = unitPrice || finalUnitPrice;
+    if (packingListId) stock.packingList = new Types.ObjectId(packingListId);
+    if (dpPrice !== undefined) stock.dpPrice = dpPrice;
+    if (exchangeRate !== undefined) stock.exchangeRate = exchangeRate;
+    if (finalPrice !== undefined) stock.finalPrice = finalPrice;
+    if (storeId) stock.store = new Types.ObjectId(storeId);
+    stock.lastUpdatedBy = new Types.ObjectId(req.user.id);
+    await stock.save();
+  } else {
+    // If not exists, create new
+    stock = await StoreStock.create({
+      product: product._id,
+      store: storeId ? new Types.ObjectId(storeId) : null,
       quantity,
       margin: marginPercentage,
       currency: selectedCurrency,
-      unitPrice: finalUnitPrice,
-      ...(storeId && { store: new Types.ObjectId(storeId) }),
+      unitPrice: unitPrice || finalUnitPrice, // Use provided unitPrice (AED) if available
+      packingList: packingListId ? new Types.ObjectId(packingListId) : undefined,
+      dpPrice,
+      exchangeRate,
+      finalPrice,
       lastUpdatedBy: new Types.ObjectId(req.user.id)
-    },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  ).populate('product', 'name code currency unitPrice quantity status')
+    });
+  }
+
+  // Re-fetch to populate
+  stock = await StoreStock.findById(stock._id)
+    .populate('product', 'name code currency unitPrice quantity status')
     .populate('store', 'name code type');
 
   return respond(res, StatusCodes.OK, stock, { message: 'Store stock updated successfully' });
