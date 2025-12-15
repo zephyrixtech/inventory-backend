@@ -12,13 +12,13 @@ import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
 
 const normalizeItems = async (
-  items: Array<{ productId: string; quantity: number }>
+  items: Array<{ productId: string; quantity: number; description?: string; unitOfMeasure?: string }>
 ) => {
   if (!Array.isArray(items) || items.length === 0) {
     throw ApiError.badRequest('Packing list items are required');
   }
 
-  const normalized: Array<{ product: Types.ObjectId; quantity: number }> = [];
+  const normalized: Array<{ product: Types.ObjectId; quantity: number; description?: string; unitOfMeasure?: string }> = [];
 
   for (const entry of items) {
     const product = await Item.findById(entry.productId);
@@ -28,7 +28,9 @@ const normalizeItems = async (
 
     normalized.push({
       product: product._id,
-      quantity: entry.quantity
+      quantity: entry.quantity,
+      description: entry.description,
+      unitOfMeasure: entry.unitOfMeasure
     });
 
     if (product.status === 'store_pending') {
@@ -85,7 +87,7 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
   }
 
   // Removed location field since we're removing location field
-  const { boxNumber, items, shipmentDate, packingDate, image1, image2, storeId, toStoreId, currency, exchangeRate, status, approvalStatus, cargoNumber, fabricDetails } = req.body;
+  const { boxNumber, items, shipmentDate, packingDate, image1, image2, storeId, toStoreId, currency, exchangeRate, status, approvalStatus, cargoNumber, fabricDetails, size, description } = req.body;
 
   const existing = await PackingList.findOne({ boxNumber });
   if (existing) {
@@ -141,7 +143,9 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
     createdBy: new Types.ObjectId(req.user.id),
     // New fields
     cargoNumber,
-    fabricDetails
+    fabricDetails,
+    size,
+    description
   });
 
   return respond(res, StatusCodes.CREATED, packingList, { message: 'Packing list created successfully' });
@@ -172,7 +176,15 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
   }
 
   // Removed location field since we're removing location field
-  const { items, shipmentDate, packingDate, status, approvalStatus, image1, image2, storeId, toStoreId, currency, exchangeRate, cargoNumber, fabricDetails } = req.body;
+  const { boxNumber, items, shipmentDate, packingDate, status, approvalStatus, image1, image2, storeId, toStoreId, currency, exchangeRate, cargoNumber, fabricDetails, size, description } = req.body;
+
+  if (boxNumber && boxNumber !== packingList.boxNumber) {
+    const existing = await PackingList.findOne({ boxNumber });
+    if (existing) {
+      throw ApiError.conflict('Packing list with this box number already exists');
+    }
+    packingList.boxNumber = boxNumber;
+  }
 
   // Removed location update since we're removing location field
   if (shipmentDate) packingList.shipmentDate = shipmentDate;
@@ -185,6 +197,8 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
   // New fields
   if (cargoNumber !== undefined) packingList.cargoNumber = cargoNumber;
   if (fabricDetails !== undefined) packingList.fabricDetails = fabricDetails;
+  if (size !== undefined) packingList.size = size;
+  if (description !== undefined) packingList.description = description;
 
   if (Array.isArray(items)) {
     const newItems = await normalizeItems(items);

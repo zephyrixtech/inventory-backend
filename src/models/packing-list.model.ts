@@ -3,6 +3,8 @@ import { Schema, model, type Document, type Types } from 'mongoose';
 export interface PackingListItem {
   product: Types.ObjectId;
   quantity: number;
+  description?: string;
+  unitOfMeasure?: string;
 }
 
 export interface PackingListDocument extends Document<Types.ObjectId> {
@@ -28,12 +30,16 @@ export interface PackingListDocument extends Document<Types.ObjectId> {
   fabricDetails?: string;
   createdAt: Date;
   updatedAt: Date;
+  size?: string;
+  description? :string;
 }
 
 const packingListItemSchema = new Schema<PackingListItem>(
   {
     product: { type: Schema.Types.ObjectId, ref: 'Item', required: true },
-    quantity: { type: Number, required: true, min: 0 }
+    quantity: { type: Number, required: true, min: 0 },
+    description: { type: String, trim: true },
+    unitOfMeasure: { type: String, trim: true }
   },
   { _id: false }
 );
@@ -59,7 +65,9 @@ const packingListSchema = new Schema<PackingListDocument>(
     approvedAt: { type: Date },
     // New fields
     cargoNumber: { type: String, trim: true },
-    fabricDetails: { type: String, trim: true }
+    fabricDetails: { type: String, trim: true },
+    size: { type: String, trim: true },
+    description: { type: String, trim: true }
   },
   {
     timestamps: true

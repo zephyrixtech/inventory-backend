@@ -11,6 +11,7 @@ export interface StoreStockDocument extends Document<Types.ObjectId> {
   updatedAt: Date;
   createdAt: Date;
   lastUpdatedBy?: Types.ObjectId;
+  unitPriceAED: number;
 }
 
 const storeStockSchema = new Schema<StoreStockDocument>(
@@ -22,7 +23,8 @@ const storeStockSchema = new Schema<StoreStockDocument>(
     margin: { type: Number, default: 0, min: 0 },
     currency: { type: String, enum: ['INR', 'AED'], default: 'INR' },
     unitPrice: { type: Number, default: 0, min: 0 },
-    lastUpdatedBy: { type: Schema.Types.ObjectId, ref: 'User' }
+    lastUpdatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    unitPriceAED: {type: Number, default: 0, min: 0 },
   },
   {
     timestamps: true
