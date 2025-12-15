@@ -16,7 +16,7 @@ export const submitQualityCheck = asyncHandler(async (req: Request, res: Respons
     throw ApiError.badRequest('User context missing');
   }
 
-  const { productId, status, remarks, damagedQuantity } = req.body;
+  const { productId, status, remarks, damagedQuantity, inspectorName } = req.body;
 
   // Removed company filter since we're removing company context
   const product = await Item.findById(productId);
@@ -51,6 +51,7 @@ export const submitQualityCheck = asyncHandler(async (req: Request, res: Respons
     remarks,
     checkedBy: req.user.id,
     checkedByName: checkerName,
+    inspectorName,
     submittedBy: req.user.id,
     submittedByName: checkerName,
     checkedAt: new Date()
@@ -74,6 +75,9 @@ export const submitQualityCheck = asyncHandler(async (req: Request, res: Respons
   if (checkerName) {
     product.qcCheckedByName = checkerName;
     product.qcSubmittedByName = checkerName;
+  }
+  if (inspectorName) {
+    product.inspectorName = inspectorName;
   }
   product.qcSubmittedBy = req.user.id as any;
   if (sanitizedDamagedQuantity !== undefined) {

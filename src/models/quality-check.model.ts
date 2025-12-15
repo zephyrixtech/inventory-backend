@@ -7,6 +7,7 @@ export interface QualityCheckDocument extends Document<Types.ObjectId> {
   remarks?: string;
   checkedBy: Types.ObjectId;
   checkedByName?: string;
+  inspectorName?: string;
   submittedBy?: Types.ObjectId;
   submittedByName?: string;
   damagedQuantity?: number;
@@ -23,6 +24,7 @@ const qualityCheckSchema = new Schema<QualityCheckDocument>(
     remarks: { type: String, trim: true },
     checkedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     checkedByName: { type: String, trim: true },
+    inspectorName: { type: String, trim: true },
     submittedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     submittedByName: { type: String, trim: true },
     damagedQuantity: { type: Number, min: 0 },

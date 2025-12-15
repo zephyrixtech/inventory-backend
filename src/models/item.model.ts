@@ -42,6 +42,7 @@ export interface ItemDocument extends Document {
   qcCheckedAt?: Date;
   qcCheckedBy?: Types.ObjectId;
   qcCheckedByName?: string;
+  inspectorName?: string;
   qcSubmittedBy?: Types.ObjectId;
   qcSubmittedByName?: string;
 
@@ -169,6 +170,10 @@ const itemSchema = new Schema<ItemDocument>(
       ref: 'User'
     },
     qcCheckedByName: {
+      type: String,
+      trim: true
+    },
+    inspectorName: {
       type: String,
       trim: true
     },
