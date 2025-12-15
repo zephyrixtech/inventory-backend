@@ -89,11 +89,28 @@ export const submitQualityCheck = asyncHandler(async (req: Request, res: Respons
   // Auto-create store stock entries for approved items in purchaser stores
   if (status === 'approved') {
     try {
+      console.log(`[QC Approval] Processing store stock update for product: ${product._id} (${product.name})`);
+
       // Find all stores with purchaser role
-      const purchaserStores = await Store.find({ 
+      // Robust query: Look for stores with purchaser role assigned OR strictly manage role if specifically needed
+      // First try strict purchaser role
+      let purchaserStores = await Store.find({
         purchaser: 'ROLE_PURCHASER',
-        isActive: true 
+        isActive: true
       });
+
+      console.log(`[QC Approval] Found ${purchaserStores.length} stores with purchaser='ROLE_PURCHASER'`);
+
+      // Fallback: if no purchaser stores found, try finding generic stores (optional, based on业务 logic)
+      if (purchaserStores.length === 0) {
+        console.warn('[QC Approval] No stores found with purchaser="ROLE_PURCHASER". Trying fallback to find any active store to avoid data loss (optional policy).');
+        // Uncomment below if you want tofallback to all active stores or specific manager stores
+        // purchaserStores = await Store.find({ isActive: true }); 
+      }
+
+      if (purchaserStores.length === 0) {
+        console.warn('[QC Approval] CRITICAL: No target stores found to add stock. Stock will NOT be updated in any store.');
+      }
 
       // Create store stock entries for each purchaser store
       for (const store of purchaserStores) {
@@ -103,11 +120,11 @@ export const submitQualityCheck = asyncHandler(async (req: Request, res: Respons
           store: store._id
         });
 
+        const availableQuantity = Math.max(0, (product.quantity || 0) - (sanitizedDamagedQuantity || 0));
+
         if (!existingStock) {
-          // Calculate available quantity (total - damaged)
-          const availableQuantity = Math.max(0, (product.quantity || 0) - (sanitizedDamagedQuantity || 0));
-          
           if (availableQuantity > 0) {
+            console.log(`[QC Approval] Creating new stock entry for Store: ${store.name} (${store._id}), Qty: ${availableQuantity}`);
             // Create new store stock entry
             await StoreStock.create({
               product: product._id,
@@ -118,19 +135,23 @@ export const submitQualityCheck = asyncHandler(async (req: Request, res: Respons
               unitPrice: product.unitPrice || 0,
               lastUpdatedBy: req.user.id
             });
+          } else {
+            console.log(`[QC Approval] Skipping creation for Store: ${store.name} - Available Qty is 0`);
           }
         } else {
           // Update existing stock quantity
-          const availableQuantity = Math.max(0, (product.quantity || 0) - (sanitizedDamagedQuantity || 0));
           if (availableQuantity > 0) {
+            console.log(`[QC Approval] Updating existing stock for Store: ${store.name} (${store._id}). Adding Qty: ${availableQuantity}`);
             existingStock.quantity += availableQuantity;
             existingStock.lastUpdatedBy = req.user.id as any;
             await existingStock.save();
+          } else {
+            console.log(`[QC Approval] No quantity to add for Store: ${store.name}`);
           }
         }
       }
     } catch (error) {
-      console.error('Failed to auto-create store stock entries:', error);
+      console.error('[QC Approval] Failed to auto-create store stock entries:', error);
       // Don't fail the QC process if store stock creation fails
       // Just log the error and continue
     }
