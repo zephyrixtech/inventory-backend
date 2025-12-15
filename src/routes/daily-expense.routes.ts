@@ -3,7 +3,7 @@ import { body, param } from 'express-validator';
 
 import { authenticate, authorize } from '../middlewares/auth';
 import { validateRequest } from '../middlewares/validate-request';
-import { listDailyExpenses, createDailyExpense, deleteDailyExpense } from '../controllers/daily-expense.controller';
+import { listDailyExpenses, createDailyExpense, deleteDailyExpense, updateDailyExpense } from '../controllers/daily-expense.controller';
 
 const router = Router();
 
@@ -23,6 +23,21 @@ router.post(
   ],
   validateRequest,
   createDailyExpense
+);
+
+router.put(
+  '/:id',
+  [
+    param('id').isMongoId(),
+    body('supplierId').optional().isMongoId(),
+    body('description').optional().notEmpty(),
+    body('amount').optional().isNumeric(),
+    body('date').optional().isISO8601(),
+    body('type').optional().isIn(['purchase', 'petty']),
+    body('paymentType').optional().isIn(['cash', 'card', 'upi'])
+  ],
+  validateRequest,
+  updateDailyExpense
 );
 
 router.delete('/:id', [param('id').isMongoId()], validateRequest, deleteDailyExpense);

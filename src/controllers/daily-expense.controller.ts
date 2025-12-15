@@ -81,6 +81,47 @@ export const createDailyExpense = asyncHandler(async (req: Request, res: Respons
   return respond(res, StatusCodes.CREATED, populatedExpense, { message: 'Expense recorded successfully' });
 });
 
+export const updateDailyExpense = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { supplierId, description, amount, date, type, paymentType, transactionId } = req.body;
+
+  const expense = await DailyExpense.findById(id);
+  if (!expense) {
+    throw ApiError.notFound('Expense not found');
+  }
+
+  // Validate transactionId for card and upi payments if they are being updated
+  const finalPaymentType = paymentType || expense.paymentType;
+  const finalTransactionId = transactionId !== undefined ? transactionId : expense.transactionId;
+
+  if ((finalPaymentType === 'card' || finalPaymentType === 'upi') && !finalTransactionId) {
+    throw ApiError.badRequest('Transaction ID is required for card and UPI payments');
+  }
+
+  let supplier: SupplierDocument | null = null;
+  if (supplierId) {
+    supplier = await Supplier.findById(supplierId);
+    if (!supplier) {
+      throw ApiError.notFound('Supplier not found');
+    }
+  }
+
+  // Update fields
+  if (supplierId !== undefined) expense.supplier = supplier ? supplier._id : undefined;
+  if (description !== undefined) expense.description = description;
+  if (amount !== undefined) expense.amount = amount;
+  if (date !== undefined) expense.date = date;
+  if (type !== undefined) expense.type = type;
+  if (paymentType !== undefined) expense.paymentType = paymentType;
+  if (transactionId !== undefined) expense.transactionId = transactionId;
+
+  await expense.save();
+
+  const populatedExpense = await DailyExpense.findById(expense._id).populate('supplier', 'name');
+
+  return respond(res, StatusCodes.OK, populatedExpense, { message: 'Expense updated successfully' });
+});
+
 export const deleteDailyExpense = asyncHandler(async (req: Request, res: Response) => {
   const expense = await DailyExpense.findById(req.params.id);
 
