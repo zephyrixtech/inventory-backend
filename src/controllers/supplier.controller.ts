@@ -81,7 +81,7 @@ export const createSupplier = asyncHandler(async (req: Request, res: Response) =
     email,
     phone,
     contactPerson,
-    status,
+    status: status || 'pending',
     address,
     registrationNumber,
     website,

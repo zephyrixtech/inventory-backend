@@ -134,14 +134,16 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   // Handle role properly based on the user model definition
   const roleInfo = user.role || 'biller';
 
-  // Get role permissions if needed (for superadmin role, we might want to give all permissions)
+  // Get role permissions based on role
   let permissions: string[] = [];
-  if (user.role === 'superadmin') {
-    // Super admin gets all permissions
+  if (user.role === 'superadmin' || user.role === 'admin') {
+    // Super admin and admin get all permissions
     permissions = ['*'];
+  } else if (user.role === 'purchaser') {
+    permissions = ['manage_purchases', 'manage_inventory', 'manage_packing', 'manage_qc', 'manage_suppliers', 'manage_expenses'];
+  } else if (user.role === 'biller') {
+    permissions = ['manage_sales', 'manage_inventory'];
   } else {
-    // For other roles, we would need to fetch permissions from the role model
-    // But since the user.role is a string, not a reference, we'll leave it empty for now
     permissions = [];
   }
 
@@ -209,13 +211,16 @@ export const refresh = asyncHandler(async (req: Request, res: Response) => {
     // Handle role properly based on the user model definition
     const roleInfo = user.role || 'biller';
 
-    // Get role permissions if needed
+    // Get role permissions based on role
     let permissions: string[] = [];
-    if (user.role === 'superadmin') {
-      // Super admin gets all permissions
+    if (user.role === 'superadmin' || user.role === 'admin') {
+      // Super admin and admin get all permissions
       permissions = ['*'];
+    } else if (user.role === 'purchaser') {
+      permissions = ['manage_purchases', 'manage_inventory', 'manage_packing', 'manage_qc', 'manage_suppliers', 'manage_expenses'];
+    } else if (user.role === 'biller') {
+      permissions = ['manage_sales', 'manage_inventory'];
     } else {
-      // For other roles, permissions would be fetched differently
       permissions = [];
     }
 
@@ -266,13 +271,16 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
   // Handle role properly based on the user model definition
   const roleInfo = user.role || 'biller';
 
-  // Get role permissions if needed
+  // Get role permissions based on role
   let permissions: string[] = [];
-  if (user.role === 'superadmin') {
-    // Super admin gets all permissions
+  if (user.role === 'superadmin' || user.role === 'admin') {
+    // Super admin and admin get all permissions
     permissions = ['*'];
+  } else if (user.role === 'purchaser') {
+    permissions = ['manage_purchases', 'manage_inventory', 'manage_packing', 'manage_qc', 'manage_suppliers', 'manage_expenses'];
+  } else if (user.role === 'biller') {
+    permissions = ['manage_sales', 'manage_inventory'];
   } else {
-    // For other roles, permissions would be fetched differently
     permissions = [];
   }
 

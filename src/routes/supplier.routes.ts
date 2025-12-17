@@ -16,8 +16,8 @@ router.get('/:id', [param('id').isMongoId()], validateRequest, getSupplier);
 router.post(
   '/',
   [
-    body('name').notEmpty(),
-    body('status').isIn(['pending', 'approved', 'rejected']),
+    body('name').notEmpty().withMessage('Company name is required'),
+    body('status').optional().isIn(['pending', 'approved', 'rejected']).withMessage('Invalid status'),
     // Optional fields can be validated here if needed
   ],
   validateRequest,
