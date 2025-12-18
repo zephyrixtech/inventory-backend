@@ -3,6 +3,7 @@ import { StatusCodes } from 'http-status-codes';
 
 import { DailyExpense } from '../models/daily-expense.model';
 import { Supplier, type SupplierDocument } from '../models/supplier.model';
+import { User } from '../models/user.model';
 import { ApiError } from '../utils/api-error';
 import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
@@ -10,10 +11,27 @@ import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
 
 export const listDailyExpenses = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw ApiError.badRequest('User context missing');
+  }
+
   const { from, to, supplierId } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
   const filters: Record<string, unknown> = {};
+
+  // Get user from database to check role
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    throw ApiError.unauthorized('User not found');
+  }
+
+  // Apply user-specific filtering based on role
+  if (user.role === 'purchaser' || user.role === 'biller') {
+    // Purchasers and billers can only see their own created expenses
+    filters.createdBy = req.user.id;
+  }
+  // superadmin and admin can see all expenses (no additional filter needed)
 
   if (supplierId) {
     filters.supplier = supplierId;
@@ -82,12 +100,29 @@ export const createDailyExpense = asyncHandler(async (req: Request, res: Respons
 });
 
 export const updateDailyExpense = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw ApiError.badRequest('User context missing');
+  }
+
   const { id } = req.params;
   const { supplierId, description, amount, date, type, paymentType, transactionId } = req.body;
 
-  const expense = await DailyExpense.findById(id);
+  // Get user from database to check role
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    throw ApiError.unauthorized('User not found');
+  }
+
+  // Build query filters based on user role
+  const filters: Record<string, unknown> = { _id: id };
+  if (user.role === 'purchaser' || user.role === 'biller') {
+    // Purchasers and billers can only update their own created expenses
+    filters.createdBy = req.user.id;
+  }
+
+  const expense = await DailyExpense.findOne(filters);
   if (!expense) {
-    throw ApiError.notFound('Expense not found');
+    throw ApiError.notFound('Expense not found or you do not have permission to update it');
   }
 
   // Validate transactionId for card and upi payments if they are being updated
@@ -123,10 +158,26 @@ export const updateDailyExpense = asyncHandler(async (req: Request, res: Respons
 });
 
 export const deleteDailyExpense = asyncHandler(async (req: Request, res: Response) => {
-  const expense = await DailyExpense.findById(req.params.id);
+  if (!req.user) {
+    throw ApiError.badRequest('User context missing');
+  }
 
+  // Get user from database to check role
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    throw ApiError.unauthorized('User not found');
+  }
+
+  // Build query filters based on user role
+  const filters: Record<string, unknown> = { _id: req.params.id };
+  if (user.role === 'purchaser' || user.role === 'biller') {
+    // Purchasers and billers can only delete their own created expenses
+    filters.createdBy = req.user.id;
+  }
+
+  const expense = await DailyExpense.findOne(filters);
   if (!expense) {
-    throw ApiError.notFound('Expense not found');
+    throw ApiError.notFound('Expense not found or you do not have permission to delete it');
   }
 
   await expense.deleteOne();

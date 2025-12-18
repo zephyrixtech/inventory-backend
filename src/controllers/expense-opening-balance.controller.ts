@@ -4,16 +4,35 @@ import { StatusCodes } from 'http-status-codes';
 
 import { ExpenseOpeningBalance } from '../models/expense-opening-balance.model';
 import { DailyExpense } from '../models/daily-expense.model';
+import { User } from '../models/user.model';
 import { ApiError } from '../utils/api-error';
 import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
 
 export const listOpeningBalances = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw ApiError.badRequest('User context missing');
+  }
+
   const { page = 1, limit = 20 } = req.query;
   const pageNum = parseInt(page as string, 10);
   const limitNum = parseInt(limit as string, 10);
 
-  const query = ExpenseOpeningBalance.find()
+  // Get user from database to check role
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    throw ApiError.unauthorized('User not found');
+  }
+
+  // Build query filters based on user role
+  const filters: Record<string, unknown> = {};
+  if (user.role === 'purchaser' || user.role === 'biller') {
+    // Purchasers and billers can only see their own created opening balances
+    filters.createdBy = req.user.id;
+  }
+  // superadmin and admin can see all opening balances (no additional filter needed)
+
+  const query = ExpenseOpeningBalance.find(filters)
     .populate('createdBy', 'firstName lastName')
     .populate('updatedBy', 'firstName lastName')
     .sort({ createdAt: -1 });
@@ -22,11 +41,17 @@ export const listOpeningBalances = asyncHandler(async (req: Request, res: Respon
 
   const [balances, total] = await Promise.all([
     query.exec(),
-    ExpenseOpeningBalance.countDocuments()
+    ExpenseOpeningBalance.countDocuments(filters)
   ]);
 
-  // Calculate total expenses for each balance
+  // Calculate total expenses for each balance (filtered by user if needed)
+  const expenseFilters: Record<string, unknown> = {};
+  if (user.role === 'purchaser' || user.role === 'biller') {
+    expenseFilters.createdBy = new Types.ObjectId(req.user.id);
+  }
+
   const totalExpenses = await DailyExpense.aggregate([
+    { $match: expenseFilters },
     {
       $group: {
         _id: null,
@@ -59,8 +84,25 @@ export const listOpeningBalances = asyncHandler(async (req: Request, res: Respon
 });
 
 export const getOpeningBalance = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw ApiError.badRequest('User context missing');
+  }
+
+  // Get user from database to check role
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    throw ApiError.unauthorized('User not found');
+  }
+
+  // Build query filters based on user role
+  const filters: Record<string, unknown> = {};
+  if (user.role === 'purchaser' || user.role === 'biller') {
+    // Purchasers and billers can only see their own created opening balances
+    filters.createdBy = req.user.id;
+  }
+
   // Get the latest opening balance
-  const openingBalance = await ExpenseOpeningBalance.findOne()
+  const openingBalance = await ExpenseOpeningBalance.findOne(filters)
     .sort({ createdAt: -1 })
     .populate('createdBy', 'firstName lastName')
     .populate('updatedBy', 'firstName lastName');
@@ -75,8 +117,14 @@ export const getOpeningBalance = asyncHandler(async (req: Request, res: Response
     });
   }
 
-  // Calculate total expenses
+  // Calculate total expenses (filtered by user if needed)
+  const expenseFilters: Record<string, unknown> = {};
+  if (user.role === 'purchaser' || user.role === 'biller') {
+    expenseFilters.createdBy = new Types.ObjectId(req.user.id);
+  }
+
   const totalExpenses = await DailyExpense.aggregate([
+    { $match: expenseFilters },
     {
       $group: {
         _id: null,
@@ -118,8 +166,20 @@ export const createOpeningBalance = asyncHandler(async (req: Request, res: Respo
     updatedBy: new Types.ObjectId(req.user.id)
   });
 
-  // Calculate total expenses and remaining balance
+  // Calculate total expenses and remaining balance (filtered by user if needed)
+  // Get user from database to check role
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    throw ApiError.unauthorized('User not found');
+  }
+
+  const expenseFilters: Record<string, unknown> = {};
+  if (user.role === 'purchaser' || user.role === 'biller') {
+    expenseFilters.createdBy = new Types.ObjectId(req.user.id);
+  }
+
   const totalExpenses = await DailyExpense.aggregate([
+    { $match: expenseFilters },
     {
       $group: {
         _id: null,
@@ -162,10 +222,22 @@ export const updateOpeningBalance = asyncHandler(async (req: Request, res: Respo
   const { id } = req.params;
   const { amount, description } = req.body;
 
-  const openingBalance = await ExpenseOpeningBalance.findById(id);
+  // Get user from database to check role
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    throw ApiError.unauthorized('User not found');
+  }
 
+  // Build query filters based on user role
+  const filters: Record<string, unknown> = { _id: id };
+  if (user.role === 'purchaser' || user.role === 'biller') {
+    // Purchasers and billers can only update their own created opening balances
+    filters.createdBy = req.user.id;
+  }
+
+  const openingBalance = await ExpenseOpeningBalance.findOne(filters);
   if (!openingBalance) {
-    throw ApiError.notFound('Opening balance not found');
+    throw ApiError.notFound('Opening balance not found or you do not have permission to update it');
   }
 
   openingBalance.amount = amount;
@@ -174,8 +246,14 @@ export const updateOpeningBalance = asyncHandler(async (req: Request, res: Respo
   openingBalance.updatedBy = new Types.ObjectId(req.user.id);
   await openingBalance.save();
 
-  // Calculate total expenses and remaining balance
+  // Calculate total expenses and remaining balance (filtered by user if needed)
+  const expenseFilters: Record<string, unknown> = {};
+  if (user.role === 'purchaser' || user.role === 'biller') {
+    expenseFilters.createdBy = new Types.ObjectId(req.user.id);
+  }
+
   const totalExpenses = await DailyExpense.aggregate([
+    { $match: expenseFilters },
     {
       $group: {
         _id: null,
@@ -211,12 +289,28 @@ export const updateOpeningBalance = asyncHandler(async (req: Request, res: Respo
 });
 
 export const deleteOpeningBalance = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw ApiError.badRequest('User context missing');
+  }
+
   const { id } = req.params;
 
-  const openingBalance = await ExpenseOpeningBalance.findById(id);
+  // Get user from database to check role
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    throw ApiError.unauthorized('User not found');
+  }
 
+  // Build query filters based on user role
+  const filters: Record<string, unknown> = { _id: id };
+  if (user.role === 'purchaser' || user.role === 'biller') {
+    // Purchasers and billers can only delete their own created opening balances
+    filters.createdBy = req.user.id;
+  }
+
+  const openingBalance = await ExpenseOpeningBalance.findOne(filters);
   if (!openingBalance) {
-    throw ApiError.notFound('Opening balance not found');
+    throw ApiError.notFound('Opening balance not found or you do not have permission to delete it');
   }
 
   await openingBalance.deleteOne();

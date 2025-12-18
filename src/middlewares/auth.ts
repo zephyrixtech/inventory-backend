@@ -1,5 +1,4 @@
 import type { NextFunction, Request, Response } from 'express';
-import { Types } from 'mongoose';
 
 import { User } from '../models/user.model';
 import { ApiError } from '../utils/api-error';
@@ -11,7 +10,7 @@ const ROLE_PERMISSION_FALLBACK: Record<string, string[]> = {
   superadmin: ['*'],
   admin: ['*'],
   purchaser: ['manage_purchases', 'manage_inventory', 'manage_packing', 'manage_qc', 'manage_suppliers', 'manage_expenses'],
-  biller: ['manage_sales', 'manage_inventory']
+  biller: ['manage_sales', 'manage_inventory', 'manage_expenses', 'manage_suppliers']
 };
 
 const parseAuthHeader = (authorization?: string): string | null => {
@@ -37,36 +36,30 @@ export const authenticate = asyncHandler(async (req: Request, _res: Response, ne
   try {
     const payload = verifyAccessToken(token);
 
-    const user = await User.findById(payload.sub).populate('role', 'permissions company');
+    const user = await User.findById(payload.sub);
 
     if (!user || !user.isActive || user.status !== 'active') {
       throw ApiError.unauthorized('User is not active');
     }
 
-    const populatedRole = user.role as unknown as { _id?: Types.ObjectId; permissions?: string[]; name?: string };
+    // Since role is stored as a string in the User model, use it directly
+    const userRole = user.role;
+    const resolvedPermissions = ROLE_PERMISSION_FALLBACK[userRole] || [];
 
-    let resolvedRoleId: string;
-    if (typeof user.role === 'string' && user.role.length > 0) {
-      resolvedRoleId = user.role;
-    } else if (populatedRole?._id) {
-      resolvedRoleId = populatedRole._id.toString();
-    } else if (typeof payload.role === 'string') {
-      resolvedRoleId = payload.role;
-    } else {
-      resolvedRoleId = '';
+    // Debug logging for biller role
+    if (userRole === 'biller') {
+      logger.info({
+        userId: user._id.toString(),
+        userRole,
+        resolvedPermissions,
+        fallbackPermissions: ROLE_PERMISSION_FALLBACK[userRole]
+      }, 'Biller authentication debug');
     }
-
-    const resolvedPermissions =
-      populatedRole?.permissions ??
-      payload.permissions ??
-      (typeof user.role === 'string' ? ROLE_PERMISSION_FALLBACK[user.role] : undefined) ??
-      (populatedRole?.name ? ROLE_PERMISSION_FALLBACK[populatedRole.name] : []) ??
-      [];
 
     req.user = {
       id: user._id.toString(),
       // Removed company field since we're removing company context
-      role: resolvedRoleId,
+      role: userRole,
       permissions: resolvedPermissions
     };
     // Removed companyId assignment since we're removing company context
