@@ -56,6 +56,11 @@ export const getSupplier = asyncHandler(async (req: Request, res: Response) => {
 
 export const createSupplier = asyncHandler(async (req: Request, res: Response) => {
   try {
+    console.log('=== CREATE SUPPLIER DEBUG ===');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    console.log('User context:', req.user ? { id: req.user.id, role: req.user.role } : 'No user');
+    console.log('MongoDB connection state:', require('mongoose').connection.readyState);
+    
     const { 
       name, 
       email, 
@@ -77,37 +82,53 @@ export const createSupplier = asyncHandler(async (req: Request, res: Response) =
       rating
     } = req.body;
 
-  const supplierData: any = {
-    name,
-    email,
-    phone,
-    contactPerson,
-    status: status || 'pending',
-    address,
-    registrationNumber,
-    website,
-    city,
-    state,
-    postalCode,
-    country,
-    bankName,
-    bank_account_number,
-    ifscCode,
-    ibanCode,
-    description,
-    rating
-  };
+    if (!name || name.trim() === '') {
+      console.error('Validation failed: name is required');
+      throw ApiError.badRequest('Company name is required');
+    }
 
-  // Only add createdBy if user exists
-  if (req.user?.id) {
-    supplierData.createdBy = req.user.id;
-  }
+    const supplierData: any = {
+      name: name.trim(),
+      email: email?.trim() || undefined,
+      phone: phone?.trim() || undefined,
+      contactPerson: contactPerson?.trim() || undefined,
+      status: status || 'pending',
+      address: address?.trim() || undefined,
+      registrationNumber: registrationNumber?.trim() || undefined,
+      website: website?.trim() || undefined,
+      city: city?.trim() || undefined,
+      state: state?.trim() || undefined,
+      postalCode: postalCode?.trim() || undefined,
+      country: country?.trim() || undefined,
+      bankName: bankName?.trim() || undefined,
+      bank_account_number: bank_account_number?.trim() || undefined,
+      ifscCode: ifscCode?.trim() || undefined,
+      ibanCode: ibanCode?.trim() || undefined,
+      description: description?.trim() || undefined,
+      rating: rating || undefined
+    };
 
+    // Only add createdBy if user exists
+    if (req.user?.id) {
+      supplierData.createdBy = req.user.id;
+      console.log('Adding createdBy:', req.user.id);
+    } else {
+      console.log('No user context, skipping createdBy');
+    }
+
+    console.log('Creating supplier with data:', JSON.stringify(supplierData, null, 2));
     const supplier = await Supplier.create(supplierData);
+    console.log('Supplier created successfully:', supplier._id);
 
     return respond(res, StatusCodes.CREATED, supplier, { message: 'Supplier created successfully' });
   } catch (error) {
-    console.error('Error creating supplier:', error);
+    console.error('=== ERROR CREATING SUPPLIER ===');
+    console.error('Error type:', error?.constructor?.name);
+    console.error('Error message:', error instanceof Error ? error.message : String(error));
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    if (error && typeof error === 'object' && 'errors' in error) {
+      console.error('Validation errors:', JSON.stringify((error as any).errors, null, 2));
+    }
     throw error;
   }
 });
