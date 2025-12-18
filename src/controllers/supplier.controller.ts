@@ -55,28 +55,29 @@ export const getSupplier = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const createSupplier = asyncHandler(async (req: Request, res: Response) => {
-  const { 
-    name, 
-    email, 
-    phone, 
-    contactPerson, 
-    status, 
-    address, 
-    registrationNumber,
-    website,
-    city,
-    state,
-    postalCode,
-    country,
-    bankName,
-    bank_account_number,
-    ifscCode,
-    ibanCode,
-    description,
-    rating
-  } = req.body;
+  try {
+    const { 
+      name, 
+      email, 
+      phone, 
+      contactPerson, 
+      status, 
+      address, 
+      registrationNumber,
+      website,
+      city,
+      state,
+      postalCode,
+      country,
+      bankName,
+      bank_account_number,
+      ifscCode,
+      ibanCode,
+      description,
+      rating
+    } = req.body;
 
-  const supplier = await Supplier.create({
+  const supplierData: any = {
     name,
     email,
     phone,
@@ -94,11 +95,21 @@ export const createSupplier = asyncHandler(async (req: Request, res: Response) =
     ifscCode,
     ibanCode,
     description,
-    rating,
-    createdBy: req.user?.id
-  });
+    rating
+  };
 
-  return respond(res, StatusCodes.CREATED, supplier, { message: 'Supplier created successfully' });
+  // Only add createdBy if user exists
+  if (req.user?.id) {
+    supplierData.createdBy = req.user.id;
+  }
+
+    const supplier = await Supplier.create(supplierData);
+
+    return respond(res, StatusCodes.CREATED, supplier, { message: 'Supplier created successfully' });
+  } catch (error) {
+    console.error('Error creating supplier:', error);
+    throw error;
+  }
 });
 
 export const updateSupplier = asyncHandler(async (req: Request, res: Response) => {
