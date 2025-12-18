@@ -4,10 +4,38 @@ import { body, param } from 'express-validator';
 import { authenticate, authorize } from '../middlewares/auth';
 import { validateRequest } from '../middlewares/validate-request';
 import { listDailyExpenses, createDailyExpense, deleteDailyExpense, updateDailyExpense } from '../controllers/daily-expense.controller';
+import {
+  listOpeningBalances,
+  getOpeningBalance,
+  createOpeningBalance,
+  updateOpeningBalance,
+  deleteOpeningBalance
+} from '../controllers/expense-opening-balance.controller';
 
 const router = Router();
 
 router.use(authenticate, authorize(['manage_expenses']));
+
+// Opening balance routes - full CRUD
+router.get('/opening-balance/list', listOpeningBalances);
+router.get('/opening-balance/current', getOpeningBalance);
+router.post(
+  '/opening-balance',
+  [body('amount').isNumeric().withMessage('Amount must be a number'), body('description').optional().isString()],
+  validateRequest,
+  createOpeningBalance
+);
+router.put(
+  '/opening-balance/:id',
+  [
+    param('id').isMongoId(),
+    body('amount').isNumeric().withMessage('Amount must be a number'),
+    body('description').optional().isString()
+  ],
+  validateRequest,
+  updateOpeningBalance
+);
+router.delete('/opening-balance/:id', [param('id').isMongoId()], validateRequest, deleteOpeningBalance);
 
 router.get('/', listDailyExpenses);
 
