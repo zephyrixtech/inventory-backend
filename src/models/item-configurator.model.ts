@@ -44,7 +44,7 @@ const itemConfiguratorSchema = new Schema<ItemConfiguratorDocument>(
   }
 );
 
-itemConfiguratorSchema.index({ company: 1, sequence: 1 }, { unique: true });
-itemConfiguratorSchema.index({ company: 1, name: 1 });
+// itemConfiguratorSchema.index({ company: 1, sequence: 1 }, { unique: true });
+// itemConfiguratorSchema.index({ company: 1, name: 1 });
 
 export const ItemConfigurator = model<ItemConfiguratorDocument>('ItemConfigurator', itemConfiguratorSchema);

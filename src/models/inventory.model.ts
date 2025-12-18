@@ -33,7 +33,7 @@ const inventorySchema = new Schema<InventoryDocument>(
   }
 );
 
-inventorySchema.index({ company: 1, item: 1, store: 1 }, { unique: true });
+// inventorySchema.index({ company: 1, item: 1, store: 1 }, { unique: true });
 
 export const Inventory = model<InventoryDocument>('Inventory', inventorySchema);
 

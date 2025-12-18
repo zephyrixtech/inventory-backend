@@ -57,7 +57,7 @@ const storeSchema = new Schema<StoreDocument>(
   }
 );
 
-storeSchema.index({ company: 1, code: 1 }, { unique: true });
-storeSchema.index({ company: 1, name: 1 });
+// storeSchema.index({ company: 1, code: 1 }, { unique: true });
+// storeSchema.index({ company: 1, name: 1 });
 
 export const Store = model<StoreDocument>('Store', storeSchema);

@@ -74,7 +74,7 @@ const packingListSchema = new Schema<PackingListDocument>(
   }
 );
 
-packingListSchema.index({ boxNumber: 1 }, { unique: true });
+// packingListSchema.index({ boxNumber: 1 }, { unique: true });
 
 packingListSchema.pre('save', function (next) {
   this.totalQuantity = this.items.reduce((sum, item) => sum + (item.quantity || 0), 0);

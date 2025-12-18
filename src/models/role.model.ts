@@ -23,7 +23,7 @@ const roleSchema = new Schema<RoleDocument>(
   }
 );
 
-roleSchema.index({ company: 1, name: 1 }, { unique: true });
+// roleSchema.index({ company: 1, name: 1 }, { unique: true });
 
 export const Role = model<RoleDocument>('Role', roleSchema);
 

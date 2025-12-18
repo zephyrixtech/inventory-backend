@@ -25,7 +25,7 @@ const currencyRateSchema = new Schema<CurrencyRateDocument>(
   }
 );
 
-currencyRateSchema.index({ company: 1, fromCurrency: 1, toCurrency: 1 }, { unique: true });
+// currencyRateSchema.index({ company: 1, fromCurrency: 1, toCurrency: 1 }, { unique: true });
 
 export const CurrencyRate = model<CurrencyRateDocument>('CurrencyRate', currencyRateSchema);
 

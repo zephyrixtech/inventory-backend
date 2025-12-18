@@ -35,7 +35,7 @@ const qualityCheckSchema = new Schema<QualityCheckDocument>(
   }
 );
 
-qualityCheckSchema.index({ company: 1, product: 1 }, { unique: true });
+// qualityCheckSchema.index({ company: 1, product: 1 }, { unique: true });
 
 export const QualityCheck = model<QualityCheckDocument>('QualityCheck', qualityCheckSchema);
 

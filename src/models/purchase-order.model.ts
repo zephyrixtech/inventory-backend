@@ -77,7 +77,7 @@ const purchaseOrderSchema = new Schema<PurchaseOrderDocument>(
   }
 );
 
-purchaseOrderSchema.index({ company: 1, poNumber: 1 }, { unique: true });
+// purchaseOrderSchema.index({ company: 1, poNumber: 1 }, { unique: true });
 
 export const PurchaseOrder = model<PurchaseOrderDocument>('PurchaseOrder', purchaseOrderSchema);
 
