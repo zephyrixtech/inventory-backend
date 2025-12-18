@@ -19,12 +19,14 @@ type NormalizedInvoiceItem = {
   quantity: number;
   unitPrice: number;
   discount: number;
+  vat: number; // VAT percentage
+  vatAmount: number; // VAT amount in currency
   totalPrice: number;
 };
 
 const normalizeInvoiceItems = async (
   // Removed company context - changed parameter type
-  items: Array<{ itemId: string; description?: string; quantity: number; unitPrice: number; discount?: number }>
+  items: Array<{ itemId: string; description?: string; quantity: number; unitPrice: number; discount?: number; vat?: number }>
 ) => {
   if (!Array.isArray(items) || items.length === 0) {
     throw ApiError.badRequest('At least one invoice item is required');
@@ -43,7 +45,14 @@ const normalizeInvoiceItems = async (
     const discountPercentage = entry.discount ?? 0;
     const grossAmount = entry.quantity * entry.unitPrice;
     const discountAmount = (grossAmount * discountPercentage) / 100;
-    const totalPrice = grossAmount - discountAmount;
+    
+    // Calculate VAT
+    const vatPercentage = entry.vat ?? 0;
+    const amountAfterDiscount = grossAmount - discountAmount;
+    const vatAmount = (amountAfterDiscount * vatPercentage) / 100;
+    
+    // Total price includes VAT
+    const totalPrice = amountAfterDiscount + vatAmount;
 
     normalized.push({
       item: item._id,
@@ -51,6 +60,8 @@ const normalizeInvoiceItems = async (
       quantity: entry.quantity,
       unitPrice: entry.unitPrice,
       discount: discountAmount,
+      vat: vatPercentage,
+      vatAmount: vatAmount,
       totalPrice
     });
   }
@@ -149,7 +160,8 @@ export const createSalesInvoice = asyncHandler(async (req: Request, res: Respons
 
   const subTotal = normalizedItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
   const discountTotal = normalizedItems.reduce((sum, item) => sum + (item.discount ?? 0), 0);
-  const netAmount = subTotal - discountTotal + taxAmount;
+  const vatTotal = normalizedItems.reduce((sum, item) => sum + (item.vatAmount ?? 0), 0);
+  const netAmount = subTotal - discountTotal + vatTotal + taxAmount;
 
   // Check stock availability and reduce stock quantities
   for (const item of normalizedItems) {
@@ -184,6 +196,7 @@ export const createSalesInvoice = asyncHandler(async (req: Request, res: Respons
     store: store._id,
     subTotal,
     discountTotal,
+    vatTotal,
     netAmount,
     taxAmount,
     notes,
@@ -279,10 +292,12 @@ export const updateSalesInvoice = asyncHandler(async (req: Request, res: Respons
 
     const subTotal = normalizedItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
     const discountTotal = normalizedItems.reduce((sum, item) => sum + (item.discount ?? 0), 0);
+    const vatTotal = normalizedItems.reduce((sum, item) => sum + (item.vatAmount ?? 0), 0);
     invoice.items = normalizedItems;
     invoice.subTotal = subTotal;
     invoice.discountTotal = discountTotal;
-    invoice.netAmount = subTotal - discountTotal + (invoice.taxAmount ?? 0);
+    invoice.vatTotal = vatTotal;
+    invoice.netAmount = subTotal - discountTotal + vatTotal + (invoice.taxAmount ?? 0);
   }
 
   await invoice.save();

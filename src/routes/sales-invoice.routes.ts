@@ -22,7 +22,14 @@ router.post(
     body('items').isArray({ min: 1 }),
     body('items.*.itemId').isMongoId(),
     body('items.*.quantity').isNumeric(),
-    body('items.*.unitPrice').isNumeric()
+    body('items.*.unitPrice').isNumeric(),
+    body('items.*.discount').optional().isNumeric(),
+    body('items.*.vat').optional().isNumeric().custom((value) => {
+      if (value < 0 || value > 100) {
+        throw new Error('VAT must be between 0 and 100');
+      }
+      return true;
+    })
   ],
   validateRequest,
   createSalesInvoice

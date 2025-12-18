@@ -6,6 +6,8 @@ export interface SalesInvoiceItem {
   quantity: number;
   unitPrice: number;
   discount?: number;
+  vat?: number; // VAT percentage (0-100)
+  vatAmount?: number; // Calculated VAT amount in currency
   totalPrice: number;
 }
 
@@ -17,6 +19,7 @@ export interface SalesInvoiceDocument extends Document<Types.ObjectId> {
   store: Types.ObjectId;
   subTotal: number;
   discountTotal: number;
+  vatTotal?: number; // Total VAT amount for all items
   netAmount: number;
   taxAmount: number;
   notes?: string;
@@ -33,6 +36,8 @@ const salesInvoiceItemSchema = new Schema<SalesInvoiceItem>(
     quantity: { type: Number, required: true, min: 0 },
     unitPrice: { type: Number, required: true, min: 0 },
     discount: { type: Number, default: 0, min: 0 },
+    vat: { type: Number, default: 0, min: 0, max: 100 }, // VAT percentage
+    vatAmount: { type: Number, default: 0, min: 0 }, // VAT amount in currency
     totalPrice: { type: Number, required: true, min: 0 }
   },
   { _id: false }
@@ -47,6 +52,7 @@ const salesInvoiceSchema = new Schema<SalesInvoiceDocument>(
     store: { type: Schema.Types.ObjectId, ref: 'Store', required: true },
     subTotal: { type: Number, required: true, min: 0 },
     discountTotal: { type: Number, default: 0, min: 0 },
+    vatTotal: { type: Number, default: 0, min: 0 }, // Total VAT amount
     netAmount: { type: Number, required: true, min: 0 },
     taxAmount: { type: Number, default: 0, min: 0 },
     notes: { type: String, trim: true },
