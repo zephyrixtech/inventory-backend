@@ -13,9 +13,21 @@ export const getCompany = asyncHandler(async (req: Request, res: Response) => {
   // If no company exists, create a default one
   if (!company) {
     company = await Company.create({
-      name: 'Default Company',
-      code: 'DEFAULT',
-      currency: 'USD',
+      name: 'AL LIBAS GENERAL TRADING L L C',
+      description: 'SHOP NO 5',
+      address: 'STANDARD HOMES REAL ESTATE BUILDING',
+      city: 'AJMAN',
+      state: 'INDUSTRIAL AREA 2',
+      country: 'UNITED ARAB EMIRATES',
+      postalCode: 'P.O.BOX :4381',
+      phone: '+971-55-680-5858 / +971-55-918-7607',
+      email: 'allibastrading@gmail.com',
+      currency: 'AED',
+      taxPercentage: 5,
+      bankName: 'RAKBANK',
+      bankAccountNumber: '0192594853001',
+      ibanCode: 'AE790400000192594853001',
+      code: 'ALIBAS',
       isActive: true
     });
   }
@@ -30,9 +42,21 @@ export const updateCompany = asyncHandler(async (req: Request, res: Response) =>
   // If no company exists, create a default one
   if (!company) {
     company = await Company.create({
-      name: 'Default Company',
-      code: 'DEFAULT',
-      currency: 'USD',
+      name: 'AL LIBAS GENERAL TRADING L L C',
+      description: 'SHOP NO 5',
+      address: 'STANDARD HOMES REAL ESTATE BUILDING',
+      city: 'AJMAN',
+      state: 'INDUSTRIAL AREA 2',
+      country: 'UNITED ARAB EMIRATES',
+      postalCode: 'P.O.BOX :4381',
+      phone: '+971-55-680-5858 / +971-55-918-7607',
+      email: 'allibastrading@gmail.com',
+      currency: 'AED',
+      taxPercentage: 5,
+      bankName: 'RAKBANK',
+      bankAccountNumber: '0192594853001',
+      ibanCode: 'AE790400000192594853001',
+      code: 'ALIBAS',
       isActive: true
     });
   }

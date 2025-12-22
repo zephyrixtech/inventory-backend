@@ -165,9 +165,22 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   // Get company info (using user._id as companyId since we're removing company context)
   const company = {
     id: user._id,
-    name: 'Default Company',
-    code: 'DEFAULT',
-    currency: 'USD'
+    name: 'AL LIBAS GENERAL TRADING L L C',
+    description: 'SHOP NO 5',
+    address: 'STANDARD HOMES REAL ESTATE BUILDING',
+    city: 'AJMAN',
+    state: 'INDUSTRIAL AREA 2',
+    country: 'UNITED ARAB EMIRATES',
+    postal_code: 'P.O.BOX :4381',
+    phone: '+971-55-680-5858 / +971-55-918-7607',
+    email: 'allibastrading@gmail.com',
+    currency: 'AED',
+    currency_symbol: 'AED',
+    tax_percentage: 5,
+    bank_name: 'RAKBANK',
+    bank_account_number: '0192594853001',
+    iban: 'AE790400000192594853001',
+    code: 'ALIBAS',
   };
 
   return respond(res, StatusCodes.OK, {
@@ -287,9 +300,22 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
   // Get company info (using user._id as companyId since we're removing company context)
   const company = {
     id: user._id,
-    name: 'Default Company',
-    code: 'DEFAULT',
-    currency: 'USD'
+    name: 'AL LIBAS GENERAL TRADING L L C',
+    description: 'SHOP NO 5',
+    address: 'STANDARD HOMES REAL ESTATE BUILDING',
+    city: 'AJMAN',
+    state: 'INDUSTRIAL AREA 2',
+    country: 'UNITED ARAB EMIRATES',
+    postal_code: 'P.O.BOX :4381',
+    phone: '+971-55-680-5858 / +971-55-918-7607',
+    email: 'allibastrading@gmail.com',
+    currency: 'AED',
+    currency_symbol: 'AED',
+    tax_percentage: 5,
+    bank_name: 'RAKBANK',
+    bank_account_number: '0192594853001',
+    iban: 'AE790400000192594853001',
+    code: 'ALIBAS',
   };
 
   return respond(res, StatusCodes.OK, {
@@ -298,7 +324,8 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
     lastName: user.lastName,
     email: user.email,
     role: roleInfo,
-    permissions: permissions
+    permissions: permissions,
+    company: company
   });
 });
 
