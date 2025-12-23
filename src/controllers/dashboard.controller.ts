@@ -16,21 +16,16 @@ import { respond } from '../utils/api-response';
 export const getDashboardMetrics = asyncHandler(async (req: Request, res: Response) => {
   // Removed company context check since we're removing company context
 
-  const [totalItems, inventoryRecords, purchaseOrders, salesInvoices, categories] = await Promise.all([
+  const [totalItems, totalValueResult, inventoryRecords, purchaseOrders, salesInvoices, categories] = await Promise.all([
     Item.countDocuments({}),
+    Item.aggregate([{ $group: { _id: null, total: { $sum: '$totalPrice' } } }]),
     Inventory.find({}).populate('item'),
     PurchaseOrder.find({ isActive: true }),
     SalesInvoice.find({}),
     Category.find({ isActive: true })
   ]);
 
-  const totalValue = inventoryRecords.reduce((sum, record) => {
-    const item = record.item as any;
-    if (!item) return sum;
-    
-    const price = item.unitPrice ?? record.sellingPrice ?? record.unitPrice ?? 0;
-    return sum + (record.quantity * price);
-  }, 0);
+  const totalValue = totalValueResult[0]?.total || 0;
 
   const totalPurchaseOrders = purchaseOrders.length;
   const totalPurchaseOrderValue = purchaseOrders.reduce((sum, po) => sum + (po.totalValue ?? 0), 0);
