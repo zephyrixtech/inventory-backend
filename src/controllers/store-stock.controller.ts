@@ -15,7 +15,10 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
   const { search, storeId } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
-  // Removed company context - using empty filters object
+  // Get user role from request
+  const userRole = (req.user as any)?.role || (req.user as any)?.role_name;
+
+  // Build filters object
   const filters: Record<string, unknown> = {};
 
   if (storeId && typeof storeId === 'string') {
@@ -24,26 +27,161 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
 
   if (search && typeof search === 'string') {
     const matchingProducts = await Item.find({
-      // Removed company filter since we're removing company context
       $or: [{ name: new RegExp(search, 'i') }, { code: new RegExp(search, 'i') }]
     }).select('_id');
     filters.product = { $in: matchingProducts.map((p) => p._id) };
   }
 
-  const query = StoreStock.find(filters)
-    .populate('product', 'name code currency unitPrice quantity status')
-    .populate('store', 'name code type')
-    .populate('lastUpdatedBy', 'firstName lastName');
+  // Build the aggregation pipeline for role-based filtering
+  const pipeline: any[] = [
+    { $match: filters },
+    {
+      $lookup: {
+        from: 'stores',
+        localField: 'store',
+        foreignField: '_id',
+        as: 'storeData'
+      }
+    },
+    {
+      $unwind: {
+        path: '$storeData',
+        preserveNullAndEmptyArrays: true
+      }
+    }
+  ];
 
-  if (sortBy) {
-    query.sort({ [sortBy]: sortOrder === 'asc' ? 1 : -1 });
-  } else {
-    query.sort({ updatedAt: -1 });
+  // Add role-based filtering
+  if (userRole && userRole !== 'admin' && userRole !== 'superadmin') {
+    const roleField = userRole === 'biller' ? 'storeData.biller' : 
+                     userRole === 'purchaser' ? 'storeData.purchaser' : null;
+    
+    if (roleField) {
+      pipeline.push({
+        $match: {
+          [roleField]: `ROLE_${userRole.toUpperCase()}`
+        }
+      });
+    }
   }
 
-  query.skip((page - 1) * limit).limit(limit);
+  // Add lookup for product and lastUpdatedBy
+  pipeline.push(
+    {
+      $lookup: {
+        from: 'items',
+        localField: 'product',
+        foreignField: '_id',
+        as: 'productData'
+      }
+    },
+    {
+      $unwind: {
+        path: '$productData',
+        preserveNullAndEmptyArrays: true
+      }
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'lastUpdatedBy',
+        foreignField: '_id',
+        as: 'lastUpdatedByData'
+      }
+    },
+    {
+      $unwind: {
+        path: '$lastUpdatedByData',
+        preserveNullAndEmptyArrays: true
+      }
+    }
+  );
 
-  const [stock, total] = await Promise.all([query.exec(), StoreStock.countDocuments(filters)]);
+  // Add projection to match the expected format
+  pipeline.push({
+    $project: {
+      _id: 1,
+      quantity: 1,
+      margin: 1,
+      currency: 1,
+      unitPrice: 1,
+      unitPriceAED: 1,
+      dpPrice: 1,
+      exchangeRate: 1,
+      finalPrice: 1,
+      packingList: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      __v: 1,
+      product: {
+        _id: '$productData._id',
+        id: '$productData._id',
+        name: '$productData.name',
+        code: '$productData.code',
+        unitPrice: '$productData.unitPrice',
+        currency: '$productData.currency',
+        quantity: '$productData.quantity',
+        status: '$productData.status'
+      },
+      store: {
+        _id: '$storeData._id',
+        name: '$storeData.name',
+        code: '$storeData.code',
+        type: '$storeData.type',
+        biller: '$storeData.biller',
+        purchaser: '$storeData.purchaser'
+      },
+      lastUpdatedBy: {
+        _id: '$lastUpdatedByData._id',
+        firstName: '$lastUpdatedByData.firstName',
+        lastName: '$lastUpdatedByData.lastName'
+      }
+    }
+  });
+
+  // Add sorting
+  if (sortBy) {
+    pipeline.push({ $sort: { [sortBy]: sortOrder === 'asc' ? 1 : -1 } });
+  } else {
+    pipeline.push({ $sort: { updatedAt: -1 } });
+  }
+
+  // Add pagination
+  pipeline.push(
+    { $skip: (page - 1) * limit },
+    { $limit: limit }
+  );
+
+  // Execute aggregation
+  const [stock, totalResult] = await Promise.all([
+    StoreStock.aggregate(pipeline),
+    StoreStock.aggregate([
+      { $match: filters },
+      {
+        $lookup: {
+          from: 'stores',
+          localField: 'store',
+          foreignField: '_id',
+          as: 'storeData'
+        }
+      },
+      {
+        $unwind: {
+          path: '$storeData',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      // Apply same role-based filtering for count
+      ...(userRole && userRole !== 'admin' && userRole !== 'superadmin' ? [{
+        $match: {
+          [`storeData.${userRole === 'biller' ? 'biller' : userRole === 'purchaser' ? 'purchaser' : 'none'}`]: `ROLE_${userRole.toUpperCase()}`
+        }
+      }] : []),
+      { $count: 'total' }
+    ])
+  ]);
+
+  const total = totalResult.length > 0 ? totalResult[0].total : 0;
 
   return respond(res, StatusCodes.OK, stock, buildPaginationMeta(page, limit, total));
 });
