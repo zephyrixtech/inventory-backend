@@ -77,6 +77,7 @@ export const createItem = asyncHandler(async (req: Request, res: Response) => {
     unitOfMeasure,
     vendorId, // Changed from vendor to vendorId to match frontend
     unitPrice,
+    discountAmount,
     currency,
     quantity,
     purchaseDate,
@@ -176,6 +177,7 @@ export const createItem = asyncHandler(async (req: Request, res: Response) => {
     unitOfMeasure,
     vendor: vendorObj, // Use vendorObj instead of vendorId
     unitPrice,
+    discountAmount: typeof discountAmount === 'number' ? discountAmount : undefined,
     currency,
     quantity,
     purchaseDate,
@@ -213,6 +215,7 @@ export const updateItem = asyncHandler(async (req: Request, res: Response) => {
     unitOfMeasure,
     vendorId, // Changed from vendor to vendorId to match frontend
     unitPrice,
+    discountAmount,
     currency,
     quantity,
     purchaseDate,
@@ -277,6 +280,7 @@ export const updateItem = asyncHandler(async (req: Request, res: Response) => {
   if (description !== undefined) itemDoc.description = description;
   if (unitOfMeasure !== undefined) itemDoc.unitOfMeasure = unitOfMeasure;
   if (unitPrice !== undefined) itemDoc.unitPrice = unitPrice;
+  if (typeof discountAmount === 'number') itemDoc.discountAmount = discountAmount;
   if (currency !== undefined) itemDoc.currency = currency;
   if (quantity !== undefined) itemDoc.quantity = quantity;
   if (purchaseDate !== undefined) itemDoc.purchaseDate = purchaseDate;

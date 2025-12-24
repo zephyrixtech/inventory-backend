@@ -20,6 +20,7 @@ export interface ItemDocument extends Document {
   unitOfMeasure?: string;
   vendor?: Types.ObjectId;
   unitPrice?: number;
+  discountAmount?: number; // Discount amount in currency
   currency?: 'INR' | 'AED';
 
   // Quantity fields
@@ -94,6 +95,11 @@ const itemSchema = new Schema<ItemDocument>(
     unitPrice: {
       type: Number,
       min: 0
+    },
+    discountAmount: {
+      type: Number,
+      min: 0,
+      default: 0
     },
     currency: {
       type: String,
