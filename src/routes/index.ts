@@ -21,6 +21,7 @@ import dailyExpenseRoutes from './daily-expense.routes';
 import currencyRoutes from './currency.routes';
 import reportRoutes from './report.routes';
 import companyAdministrationRoutes from './company-administration.routes';
+import purchaseEntryRoutes from './purchase-entry.routes';
 
 const apiRouter = Router();
 
@@ -45,5 +46,6 @@ apiRouter.use('/expenses', dailyExpenseRoutes);
 apiRouter.use('/currency', currencyRoutes);
 apiRouter.use('/reports', reportRoutes);
 apiRouter.use('/company-administration', companyAdministrationRoutes);
+apiRouter.use('/purchase-entries', purchaseEntryRoutes);
 
 export default apiRouter;

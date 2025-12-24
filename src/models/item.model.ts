@@ -15,12 +15,11 @@ export interface ItemDocument extends Document {
   // Removed company field since we're removing company context
   name: string;
   code: string; // This will be auto-generated if not provided
-  category: Types.ObjectId;
+  billNumber: string; // Changed from category to billNumber
   description?: string;
   unitOfMeasure?: string;
   vendor?: Types.ObjectId;
   unitPrice?: number;
-  discountAmount?: number; // Discount amount in currency
   currency?: 'INR' | 'AED';
 
   // Quantity fields
@@ -31,11 +30,6 @@ export interface ItemDocument extends Document {
   totalPrice?: number;
   purchaseDate?: Date;
   status: ItemStatus;
-
-  // Payment tracking fields
-  paidAmount?: number;
-  returnAmount?: number;
-  balanceAmount?: number;
 
   // QC fields
   qcStatus?: 'pending' | 'approved' | 'rejected';
@@ -75,10 +69,10 @@ const itemSchema = new Schema<ItemDocument>(
       required: true,
       trim: true
     },
-    category: {
-      type: Schema.Types.ObjectId,
-      ref: 'Category',
-      required: true
+    billNumber: {
+      type: String,
+      required: true,
+      trim: true
     },
     description: {
       type: String,
@@ -95,11 +89,6 @@ const itemSchema = new Schema<ItemDocument>(
     unitPrice: {
       type: Number,
       min: 0
-    },
-    discountAmount: {
-      type: Number,
-      min: 0,
-      default: 0
     },
     currency: {
       type: String,
@@ -142,20 +131,6 @@ const itemSchema = new Schema<ItemDocument>(
         'archived'
       ],
       default: 'draft'
-    },
-
-    // Payment tracking fields
-    paidAmount: {
-      type: Number,
-      min: 0
-    },
-    returnAmount: {
-      type: Number,
-      min: 0
-    },
-    balanceAmount: {
-      type: Number,
-      min: 0
     },
 
     // QC fields

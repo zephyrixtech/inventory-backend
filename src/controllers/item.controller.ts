@@ -3,7 +3,6 @@ import { StatusCodes } from 'http-status-codes';
 import { Types } from 'mongoose';
 
 import { Item } from '../models/item.model';
-import { Category, type CategoryDocument } from '../models/category.model';
 import { Vendor, type VendorDocument } from '../models/vendor.model';
 import { Supplier, type SupplierDocument } from '../models/supplier.model';
 import { ApiError } from '../utils/api-error';
@@ -15,7 +14,7 @@ import { buildPaginationMeta } from '../utils/query-builder';
 export const listItem = asyncHandler(async (req: Request, res: Response) => {
   // Removed company context check since we're removing company context
 
-  const { status, search, category, vendor } = req.query;
+  const { status, search, vendor } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
   const filters: Record<string, unknown> = {};
@@ -29,15 +28,11 @@ export const listItem = asyncHandler(async (req: Request, res: Response) => {
     filters.$or = [{ name: new RegExp(search, 'i') }, { code: new RegExp(search, 'i') }];
   }
 
-  if (category) {
-    filters.category = category;
-  }
-
   if (vendor) {
     filters.vendor = vendor;
   }
 
-  const query = Item.find(filters).populate('category', 'name').populate('vendor', 'name');
+  const query = Item.find(filters).populate('vendor', '_id name');
 
   if (sortBy) {
     query.sort({ [sortBy]: sortOrder === 'asc' ? 1 : -1 });
@@ -55,7 +50,7 @@ export const listItem = asyncHandler(async (req: Request, res: Response) => {
 export const getItem = asyncHandler(async (req: Request, res: Response) => {
   // Removed company context check since we're removing company context
 
-  const item = await Item.findById(req.params.id).populate('category', 'name').populate('vendor', 'name');
+  const item = await Item.findById(req.params.id).populate('vendor', '_id name');
 
   if (!item) {
     throw ApiError.notFound('Item not found');
@@ -72,41 +67,28 @@ export const createItem = asyncHandler(async (req: Request, res: Response) => {
   const {
     name,
     code, // Optional - will be auto-generated if not provided
-    category: categoryId,
+    billNumber, // Changed from category to billNumber
     description,
     unitOfMeasure,
     vendorId, // Changed from vendor to vendorId to match frontend
     unitPrice,
-    discountAmount,
     currency,
     quantity,
     purchaseDate,
     status,
-    paidAmount,
-    returnAmount,
-    balanceAmount,
     additionalAttributes,
     videoType,
     youtubeLink
   } = req.body;
 
-  // Validate category exists
-  console.log('Received category ID:', categoryId);
-  console.log('Category ID type:', typeof categoryId);
+  // Validate billNumber is provided
+  console.log('Received bill number:', billNumber);
+  console.log('Bill number type:', typeof billNumber);
   
-  // Check if categoryId is a valid MongoDB ObjectId
-  if (!categoryId || typeof categoryId !== 'string') {
-    console.error('Invalid category ID format - not a string:', categoryId);
-    throw ApiError.badRequest('Invalid category ID format');
+  if (!billNumber || typeof billNumber !== 'string' || billNumber.trim() === '') {
+    console.error('Invalid bill number provided:', billNumber);
+    throw ApiError.badRequest('Bill number is required');
   }
-  
-  // Try to find the category
-  const category: CategoryDocument | null = await Category.findById(categoryId);
-  if (!category) {
-    console.error('Invalid category ID provided:', categoryId);
-    throw ApiError.badRequest('Invalid category');
-  }
-  console.log('Found category:', category);
 
   // Validate vendor if provided
   let vendorObj: Types.ObjectId | undefined = undefined;
@@ -172,26 +154,22 @@ export const createItem = asyncHandler(async (req: Request, res: Response) => {
     // Removed company field since we're removing company context
     name,
     code: itemCode, // Use the auto-generated or provided code
-    category: category._id,
+    billNumber: billNumber.trim(), // Use billNumber instead of category
     description,
     unitOfMeasure,
     vendor: vendorObj, // Use vendorObj instead of vendorId
     unitPrice,
-    discountAmount: typeof discountAmount === 'number' ? discountAmount : undefined,
     currency,
     quantity,
     purchaseDate,
     status,
-    paidAmount: typeof paidAmount === 'number' ? paidAmount : undefined,
-    returnAmount: typeof returnAmount === 'number' ? returnAmount : undefined,
-    balanceAmount: typeof balanceAmount === 'number' ? balanceAmount : undefined,
     additionalAttributes,
     videoType,
     youtubeLink
   });
 
   // Populate vendor name for the response
-  await item.populate('vendor', 'name contactPerson');
+  await item.populate('vendor', '_id name');
 
   return respond(res, StatusCodes.CREATED, item, {
     message: 'Item created successfully'
@@ -210,45 +188,33 @@ export const updateItem = asyncHandler(async (req: Request, res: Response) => {
   const {
     name,
     code,
-    category: categoryId,
+    billNumber, // Changed from category to billNumber
     description,
     unitOfMeasure,
     vendorId, // Changed from vendor to vendorId to match frontend
     unitPrice,
-    discountAmount,
     currency,
     quantity,
     purchaseDate,
     status,
-    paidAmount,
-    returnAmount,
-    balanceAmount,
     additionalAttributes,
     videoType,
     youtubeLink,
     isActive
   } = req.body;
 
-  if (typeof paidAmount === 'number') itemDoc.paidAmount = paidAmount;
-  if (typeof returnAmount === 'number') itemDoc.returnAmount = returnAmount;
-  if (typeof balanceAmount === 'number') itemDoc.balanceAmount = balanceAmount;
-  if (categoryId) {
-    console.log('Validating category ID for update:', categoryId);
-    console.log('Category ID type for update:', typeof categoryId);
+  // Validate billNumber if provided
+  if (billNumber !== undefined) {
+    console.log('Validating bill number for update:', billNumber);
+    console.log('Bill number type for update:', typeof billNumber);
     
-    // Check if categoryId is a valid MongoDB ObjectId
-    if (typeof categoryId !== 'string') {
-      console.error('Invalid category ID format for update - not a string:', categoryId);
-      throw ApiError.badRequest('Invalid category ID format');
+    if (typeof billNumber !== 'string' || billNumber.trim() === '') {
+      console.error('Invalid bill number format for update:', billNumber);
+      throw ApiError.badRequest('Bill number must be a non-empty string');
     }
     
-    const category = await Category.findById(categoryId);
-    if (!category) {
-      console.error('Invalid category ID provided for update:', categoryId);
-      throw ApiError.badRequest('Invalid category');
-    }
-    (itemDoc as any).category = category._id;
-    console.log('Updated category reference:', category._id);
+    itemDoc.billNumber = billNumber.trim();
+    console.log('Updated bill number:', billNumber.trim());
   }
 
   // Validate vendor if provided
@@ -280,7 +246,6 @@ export const updateItem = asyncHandler(async (req: Request, res: Response) => {
   if (description !== undefined) itemDoc.description = description;
   if (unitOfMeasure !== undefined) itemDoc.unitOfMeasure = unitOfMeasure;
   if (unitPrice !== undefined) itemDoc.unitPrice = unitPrice;
-  if (typeof discountAmount === 'number') itemDoc.discountAmount = discountAmount;
   if (currency !== undefined) itemDoc.currency = currency;
   if (quantity !== undefined) itemDoc.quantity = quantity;
   if (purchaseDate !== undefined) itemDoc.purchaseDate = purchaseDate;
@@ -291,8 +256,7 @@ export const updateItem = asyncHandler(async (req: Request, res: Response) => {
   if (typeof isActive === 'boolean') itemDoc.isActive = isActive;
 
   await itemDoc.save();
-  await itemDoc.populate('category', 'name');
-  await itemDoc.populate('vendor', 'name');
+  await itemDoc.populate('vendor', '_id name');
 
   return respond(res, StatusCodes.OK, itemDoc, { message: 'Item updated successfully' });
 });

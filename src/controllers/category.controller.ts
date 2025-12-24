@@ -23,14 +23,9 @@ const serializeCategory = (category: CategoryDocument, itemsCount = 0) => ({
 });
 
 const ensureNoLinkedItems = async (categoryId: Types.ObjectId) => {
-  const linkedItem = await Item.exists({
-    category: categoryId,
-    isActive: true
-  });
-
-  if (linkedItem) {
-    throw ApiError.conflict('Cannot modify category. Items are associated with this category.');
-  }
+  // Since we removed category field from items, no items are linked to categories anymore
+  // This function can be simplified or removed entirely
+  return; // No items are linked to categories anymore
 };
 
 export const listCategories = asyncHandler(async (req: Request, res: Response) => {
