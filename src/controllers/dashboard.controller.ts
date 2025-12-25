@@ -2,16 +2,14 @@ import type { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { startOfDay, subDays, isSameDay } from 'date-fns';
 
-import { Types } from 'mongoose';
-
 import { Item } from '../models/item.model';
 import { Inventory } from '../models/inventory.model';
 import { PurchaseOrder } from '../models/purchase-order.model';
 import { SalesInvoice } from '../models/sales-invoice.model';
-import { Category } from '../models/category.model';
 import { StoreStock } from '../models/store-stock.model';
 import { Store } from '../models/store.model';
 import { User } from '../models/user.model';
+import { PurchaseEntry } from '../models/purchase-entry.model';
 import { ApiError } from '../utils/api-error';
 import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
@@ -63,12 +61,13 @@ export const getDashboardMetrics = asyncHandler(async (req: Request, res: Respon
   const assignedStoreIds = assignedStores.map(store => store._id);
   console.log(`Assigned store IDs for ${userRole}:`, assignedStoreIds);
 
-  const [totalItems, totalValueResult, inventoryRecords, purchaseOrders, salesInvoices] = await Promise.all([
+  const [totalItems, totalValueResult, inventoryRecords, purchaseOrders, salesInvoices, purchaseEntries] = await Promise.all([
     Item.countDocuments({}),
     Item.aggregate([{ $group: { _id: null, total: { $sum: '$totalPrice' } } }]),
     Inventory.find({}).populate('item'),
     PurchaseOrder.find({ isActive: true }),
-    SalesInvoice.find({})
+    SalesInvoice.find({}),
+    PurchaseEntry.find({ isActive: true })
   ]);
 
   const totalValue = totalValueResult[0]?.total || 0;
@@ -215,10 +214,23 @@ export const getDashboardMetrics = asyncHandler(async (req: Request, res: Respon
     salesData.push({ day: dayDate.toISOString().split('T')[0], sales: Math.round(daySales) });
   }
 
-  // Role-based fast/slow moving items and inventory alerts
+  // Generate purchase entry turnover data for purchaser, admin, and superadmin
+  let purchaseEntryData: Array<{ day: string; purchases: number }> = [];
+  if (userRole === 'purchaser' || userRole === 'admin' || userRole === 'superadmin') {
+    for (let i = 29; i >= 0; i -= 1) {
+      const dayDate = subDays(today, i);
+      const dayPurchases = purchaseEntries
+        .filter((entry) => isSameDay(new Date(entry.date), dayDate))
+        .reduce((sum, entry) => sum + entry.finalAmount, 0);
+
+      purchaseEntryData.push({ day: dayDate.toISOString().split('T')[0], purchases: Math.round(dayPurchases) });
+    }
+    console.log(`Purchase entry data generated for ${userRole}: ${purchaseEntryData.length} days`);
+  }
+
+  // Role-based fast/slow moving items
   let fastMovingItems: Array<{ name: string; avgQuantity: number }> = [];
   let slowMovingItems: Array<{ name: string; avgQuantity: number }> = [];
-  let inventoryAlerts: any[] = [];
 
   if (userRole === 'purchaser') {
     // For purchaser: use store stock data from their assigned stores (same as Store Stock page)
@@ -249,39 +261,6 @@ export const getDashboardMetrics = asyncHandler(async (req: Request, res: Respon
     const sortedItems = Object.values(storeStockAggregates).sort((a, b) => b.total - a.total);
     fastMovingItems = sortedItems.slice(0, 5).map((item) => ({ name: item.name, avgQuantity: item.total }));
     slowMovingItems = sortedItems.slice(-5).map((item) => ({ name: item.name, avgQuantity: item.total }));
-
-    // For purchaser, alerts are based on store stock levels
-    inventoryAlerts = purchaserStoreStockRecords
-      .map((record) => {
-        const product = record.product as any;
-        if (!product) return null;
-
-        const totalQty = record.quantity;
-        if (product.reorderLevel && totalQty <= product.reorderLevel) {
-          return {
-            itemName: product.name,
-            currentQty: totalQty,
-            reorderLevel: product.reorderLevel,
-            maxLevel: product.maxLevel ?? 0,
-            alertType: 'low_stock',
-            severity: totalQty === 0 ? 'high' : totalQty <= product.reorderLevel * 0.5 ? 'medium' : 'low'
-          };
-        }
-
-        if (product.maxLevel && totalQty >= product.maxLevel) {
-          return {
-            itemName: product.name,
-            currentQty: totalQty,
-            reorderLevel: product.reorderLevel ?? 0,
-            maxLevel: product.maxLevel,
-            alertType: 'excess_stock',
-            severity: totalQty >= product.maxLevel * 1.5 ? 'high' : totalQty >= product.maxLevel * 1.2 ? 'medium' : 'low'
-          };
-        }
-
-        return null;
-      })
-      .filter(Boolean) as any[];
   } else if (userRole === 'biller') {
     // For biller: use store stock data from their assigned stores
     let storeStockQuery = {};
@@ -311,42 +290,11 @@ export const getDashboardMetrics = asyncHandler(async (req: Request, res: Respon
     const sortedItems = Object.values(storeStockAggregates).sort((a, b) => b.total - a.total);
     fastMovingItems = sortedItems.slice(0, 5).map((item) => ({ name: item.name, avgQuantity: item.total }));
     slowMovingItems = sortedItems.slice(-5).map((item) => ({ name: item.name, avgQuantity: item.total }));
-
-    // For biller, alerts are based on store stock levels
-    inventoryAlerts = billerStoreStockRecords
-      .map((record) => {
-        const product = record.product as any;
-        if (!product) return null;
-
-        const totalQty = record.quantity;
-        if (product.reorderLevel && totalQty <= product.reorderLevel) {
-          return {
-            itemName: product.name,
-            currentQty: totalQty,
-            reorderLevel: product.reorderLevel,
-            maxLevel: product.maxLevel ?? 0,
-            alertType: 'low_stock',
-            severity: totalQty === 0 ? 'high' : totalQty <= product.reorderLevel * 0.5 ? 'medium' : 'low'
-          };
-        }
-
-        if (product.maxLevel && totalQty >= product.maxLevel) {
-          return {
-            itemName: product.name,
-            currentQty: totalQty,
-            reorderLevel: product.reorderLevel ?? 0,
-            maxLevel: product.maxLevel,
-            alertType: 'excess_stock',
-            severity: totalQty >= product.maxLevel * 1.5 ? 'high' : totalQty >= product.maxLevel * 1.2 ? 'medium' : 'low'
-          };
-        }
-
-        return null;
-      })
-      .filter(Boolean) as any[];
   } else {
-    // For admin/superadmin: use all inventory data
+    // For admin/superadmin: use combined inventory and store stock data (same as itemStockData logic)
     const inventoryAggregates: Record<string, { name: string; total: number }> = {};
+    
+    // Add inventory data
     inventoryRecords.forEach((record) => {
       const item = record.item as any;
       if (!item) return;
@@ -361,45 +309,35 @@ export const getDashboardMetrics = asyncHandler(async (req: Request, res: Respon
       inventoryAggregates[key].total += record.quantity;
     });
 
+    // Add store stock data
+    const storeStockRecords = await StoreStock.find({}).populate('product');
+    storeStockRecords.forEach((record) => {
+      const product = record.product as any;
+      if (!product) return;
+
+      const key = product._id.toString();
+      if (!inventoryAggregates[key]) {
+        inventoryAggregates[key] = {
+          name: product.name,
+          total: 0
+        };
+      }
+      inventoryAggregates[key].total += record.quantity;
+    });
+
+    console.log(`Admin combined aggregates for fast/slow items: ${Object.keys(inventoryAggregates).length} items`);
+
     const sortedItems = Object.values(inventoryAggregates).sort((a, b) => b.total - a.total);
     fastMovingItems = sortedItems.slice(0, 5).map((item) => ({ name: item.name, avgQuantity: item.total }));
     slowMovingItems = sortedItems.slice(-5).map((item) => ({ name: item.name, avgQuantity: item.total }));
-
-    inventoryAlerts = inventoryRecords
-      .map((record) => {
-        const item = record.item as any;
-        if (!item) return null;
-
-        const totalQty = record.quantity;
-        if (item.reorderLevel && totalQty <= item.reorderLevel) {
-          return {
-            itemName: item.name,
-            currentQty: totalQty,
-            reorderLevel: item.reorderLevel,
-            maxLevel: item.maxLevel ?? 0,
-            alertType: 'low_stock',
-            severity: totalQty === 0 ? 'high' : totalQty <= item.reorderLevel * 0.5 ? 'medium' : 'low'
-          };
-        }
-
-        if (item.maxLevel && totalQty >= item.maxLevel) {
-          return {
-            itemName: item.name,
-            currentQty: totalQty,
-            reorderLevel: item.reorderLevel ?? 0,
-            maxLevel: item.maxLevel,
-            alertType: 'excess_stock',
-            severity: totalQty >= item.maxLevel * 1.5 ? 'high' : totalQty >= item.maxLevel * 1.2 ? 'medium' : 'low'
-          };
-        }
-
-        return null;
-      })
-      .filter(Boolean) as any[];
   }
 
   console.log(`Final itemStockData for ${userRole}: ${itemStockData.length} items`);
   console.log('Item stock data:', itemStockData.map(item => ({ name: item.name, stock: item.stock })));
+  console.log(`Fast moving items for ${userRole}: ${fastMovingItems.length} items`);
+  console.log('Fast moving items:', fastMovingItems.map(item => ({ name: item.name, quantity: item.avgQuantity })));
+  console.log(`Slow moving items for ${userRole}: ${slowMovingItems.length} items`);
+  console.log('Slow moving items:', slowMovingItems.map(item => ({ name: item.name, quantity: item.avgQuantity })));
 
   return respond(res, StatusCodes.OK, {
     metrics: {
@@ -412,8 +350,8 @@ export const getDashboardMetrics = asyncHandler(async (req: Request, res: Respon
     },
     itemStockData, // Changed from categoryData to itemStockData
     salesData,
+    purchaseEntryData, // Added purchase entry turnover data
     fastMovingItems,
-    slowMovingItems,
-    inventoryAlerts
+    slowMovingItems
   });
 });
