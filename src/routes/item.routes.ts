@@ -18,7 +18,7 @@ router.post(
   [
     body('name').notEmpty(),
     body('code').optional(), // Make code optional since it will be auto-generated if not provided
-    body('category').isMongoId(), // Changed from categoryId to category to match controller expectation
+    body('billNumber').notEmpty().withMessage('Bill number is required'), // Changed from category to billNumber
     body('reorderLevel').optional().isInt({ min: 0 }),
     body('maxLevel').optional().isInt({ min: 0 }),
     body('videoType').optional().isIn(['upload', 'youtube']),
@@ -33,7 +33,7 @@ router.put(
   '/:id',
   [
     param('id').isMongoId().withMessage('Invalid item ID'),
-    body('category').optional().isMongoId().withMessage('Invalid category ID'), // Changed from categoryId to category
+    body('billNumber').optional().notEmpty().withMessage('Bill number cannot be empty'), // Changed from category to billNumber
     body('reorderLevel').optional().isInt({ min: 0 }).withMessage('Reorder level must be a non-negative integer'),
     body('maxLevel').optional().isInt({ min: 0 }).withMessage('Max level must be a non-negative integer'),
     body('videoType').optional().isIn(['upload', 'youtube']),
