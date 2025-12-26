@@ -5,6 +5,7 @@ import { PurchaseOrder } from '../models/purchase-order.model';
 import { StoreStock } from '../models/store-stock.model';
 import { SalesInvoice } from '../models/sales-invoice.model';
 import { DailyExpense } from '../models/daily-expense.model';
+import { PackingList } from '../models/packing-list.model';
 import { ApiError } from '../utils/api-error';
 import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
@@ -71,4 +72,35 @@ export const getExpenseReport = asyncHandler(async (req: Request, res: Response)
   const expenses = await DailyExpense.find().populate('product', 'name code');
 
   return respond(res, StatusCodes.OK, expenses);
+});
+
+export const getPackingListReport = asyncHandler(async (req: Request, res: Response) => {
+  const { from, to } = req.query;
+
+  // Build date filters
+  const filters: Record<string, unknown> = {};
+
+  if (from || to) {
+    filters.createdAt = {};
+    if (from) {
+      (filters.createdAt as Record<string, Date>).$gte = new Date(from as string);
+    }
+    if (to) {
+      (filters.createdAt as Record<string, Date>).$lte = new Date(to as string);
+    }
+  }
+
+  const packingLists = await PackingList.find(filters)
+    .populate('items.product', 'name code description')
+    .populate('store', 'name')
+    .populate('toStore', 'name')
+    .populate('createdBy', 'firstName lastName')
+    .sort({ createdAt: -1 });
+
+  console.log('Packing lists found:', packingLists.length);
+  if (packingLists.length > 0) {
+    console.log('Sample packing list:', JSON.stringify(packingLists[0], null, 2));
+  }
+
+  return respond(res, StatusCodes.OK, packingLists);
 });
