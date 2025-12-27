@@ -14,7 +14,7 @@ import { buildPaginationMeta } from '../utils/query-builder';
 export const listItem = asyncHandler(async (req: Request, res: Response) => {
   // Removed company context check since we're removing company context
 
-  const { status, search, vendor } = req.query;
+  const { status, search, vendor, billNumber } = req.query;
   const { page, limit, sortBy, sortOrder } = getPaginationParams(req);
 
   const filters: Record<string, unknown> = {};
@@ -30,6 +30,11 @@ export const listItem = asyncHandler(async (req: Request, res: Response) => {
 
   if (vendor) {
     filters.vendor = vendor;
+  }
+
+  // Add billNumber filter for exact match
+  if (billNumber && typeof billNumber === 'string') {
+    filters.billNumber = new RegExp(billNumber, 'i');
   }
 
   const query = Item.find(filters).populate('vendor', '_id name');
