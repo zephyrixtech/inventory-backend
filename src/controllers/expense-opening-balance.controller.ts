@@ -101,13 +101,17 @@ export const getOpeningBalance = asyncHandler(async (req: Request, res: Response
     filters.createdBy = req.user.id;
   }
 
-  // Get the latest opening balance
-  const openingBalance = await ExpenseOpeningBalance.findOne(filters)
+  // Get the latest opening balance for description display
+  const latestOpeningBalance = await ExpenseOpeningBalance.findOne(filters)
     .sort({ createdAt: -1 })
     .populate('createdBy', 'firstName lastName')
     .populate('updatedBy', 'firstName lastName');
 
-  if (!openingBalance) {
+  // Calculate total of ALL opening balances
+  const allBalances = await ExpenseOpeningBalance.find(filters);
+  const totalOpeningBalance = allBalances.reduce((sum, balance) => sum + balance.amount, 0);
+
+  if (!latestOpeningBalance) {
     return respond(res, StatusCodes.OK, {
       amount: 0,
       description: '',
@@ -134,19 +138,19 @@ export const getOpeningBalance = asyncHandler(async (req: Request, res: Response
   ]);
 
   const totalExpenseAmount = totalExpenses.length > 0 ? totalExpenses[0].total : 0;
-  const remainingBalance = openingBalance.amount - totalExpenseAmount;
+  const remainingBalance = totalOpeningBalance - totalExpenseAmount;
 
   return respond(res, StatusCodes.OK, {
-    _id: openingBalance._id,
-    amount: openingBalance.amount,
-    description: openingBalance.description,
-    date: openingBalance.date,
+    _id: latestOpeningBalance._id,
+    amount: totalOpeningBalance,
+    description: latestOpeningBalance.description,
+    date: latestOpeningBalance.date,
     totalExpenses: totalExpenseAmount,
     remainingBalance,
-    createdBy: openingBalance.createdBy,
-    updatedBy: openingBalance.updatedBy,
-    createdAt: openingBalance.createdAt,
-    updatedAt: openingBalance.updatedAt
+    createdBy: latestOpeningBalance.createdBy,
+    updatedBy: latestOpeningBalance.updatedBy,
+    createdAt: latestOpeningBalance.createdAt,
+    updatedAt: latestOpeningBalance.updatedAt
   });
 });
 
