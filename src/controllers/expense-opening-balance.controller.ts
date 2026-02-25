@@ -159,13 +159,13 @@ export const createOpeningBalance = asyncHandler(async (req: Request, res: Respo
     throw ApiError.badRequest('User context missing');
   }
 
-  const { amount, description } = req.body;
+  const { amount, description, date } = req.body;
 
   // Create new balance
   const openingBalance = await ExpenseOpeningBalance.create({
     amount,
     description: description || '',
-    date: new Date(),
+    date: date ? new Date(date) : new Date(),
     createdBy: new Types.ObjectId(req.user.id),
     updatedBy: new Types.ObjectId(req.user.id)
   });
@@ -224,7 +224,7 @@ export const updateOpeningBalance = asyncHandler(async (req: Request, res: Respo
   }
 
   const { id } = req.params;
-  const { amount, description } = req.body;
+  const { amount, description, date } = req.body;
 
   // Get user from database to check role
   const user = await User.findById(req.user.id);
@@ -246,7 +246,7 @@ export const updateOpeningBalance = asyncHandler(async (req: Request, res: Respo
 
   openingBalance.amount = amount;
   openingBalance.description = description || '';
-  openingBalance.date = new Date();
+  openingBalance.date = date ? new Date(date) : new Date();
   openingBalance.updatedBy = new Types.ObjectId(req.user.id);
   await openingBalance.save();
 
