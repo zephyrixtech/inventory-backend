@@ -37,5 +37,7 @@ const vendorSchema = new Schema<VendorDocument>(
 
 // Removed company index since we're removing company context
 // vendorSchema.index({ company: 1, name: 1 }, { unique: true });
+vendorSchema.index({ createdAt: -1 });
+vendorSchema.index({ creditReport: 1, createdAt: -1 });
 
 export const Vendor = model<VendorDocument>('Vendor', vendorSchema);

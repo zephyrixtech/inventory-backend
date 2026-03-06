@@ -30,4 +30,7 @@ const dailyExpenseSchema = new Schema<DailyExpenseDocument>(
   }
 );
 
+dailyExpenseSchema.index({ date: -1 });
+dailyExpenseSchema.index({ createdBy: 1, date: -1 });
+
 export const DailyExpense = model<DailyExpenseDocument>('DailyExpense', dailyExpenseSchema);

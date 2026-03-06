@@ -3,7 +3,14 @@ import { query } from 'express-validator';
 
 import { authenticate, authorize } from '../middlewares/auth';
 import { validateRequest } from '../middlewares/validate-request';
-import { getPurchaseReport, getStockReport, getSalesReport, getExpenseReport, getPackingListReport } from '../controllers/report.controller';
+import {
+  getPurchaseReport,
+  getStockReport,
+  getSalesReport,
+  getExpenseReport,
+  getPackingListReport,
+  getCreditNotesReport
+} from '../controllers/report.controller';
 
 const router = Router();
 
@@ -17,7 +24,18 @@ router.get(
 );
 router.get('/stock', getStockReport);
 router.get('/sales', [query('customerId').optional().isMongoId()], validateRequest, getSalesReport);
-router.get('/expenses', getExpenseReport);
+router.get(
+  '/expenses',
+  [query('from').optional().isISO8601(), query('to').optional().isISO8601()],
+  validateRequest,
+  getExpenseReport
+);
+router.get(
+  '/credit-notes',
+  [query('from').optional().isISO8601(), query('to').optional().isISO8601()],
+  validateRequest,
+  getCreditNotesReport
+);
 router.get(
   '/packing-lists',
   [query('from').optional().isISO8601(), query('to').optional().isISO8601()],
@@ -26,4 +44,3 @@ router.get(
 );
 
 export default router;
-
