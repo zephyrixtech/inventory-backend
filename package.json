@@ -13,6 +13,7 @@
     "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0",
     "seed:superadmin": "ts-node-dev --transpile-only src/scripts/seed-superadmin.ts",
     "unlock-user": "ts-node-dev --transpile-only src/scripts/unlock-user.ts",
+    "fix:store-stock-index": "ts-node-dev --transpile-only src/scripts/repair-store-stock-index.ts",
     "vercel-build": "npm run build"
   },
   "dependencies": {
