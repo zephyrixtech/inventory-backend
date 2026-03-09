@@ -94,6 +94,20 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
         path: '$lastUpdatedByData',
         preserveNullAndEmptyArrays: true
       }
+    },
+    {
+      $lookup: {
+        from: 'packinglists',
+        localField: 'packingList',
+        foreignField: '_id',
+        as: 'packingListData'
+      }
+    },
+    {
+      $unwind: {
+        path: '$packingListData',
+        preserveNullAndEmptyArrays: true
+      }
     }
   );
 
@@ -110,6 +124,13 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
       exchangeRate: 1,
       finalPrice: 1,
       packingList: 1,
+      shipmentDate: '$packingListData.shipmentDate',
+      cargoNumber: '$packingListData.cargoNumber',
+      packingListDetails: {
+        _id: '$packingListData._id',
+        shipmentDate: '$packingListData.shipmentDate',
+        cargoNumber: '$packingListData.cargoNumber'
+      },
       createdAt: 1,
       updatedAt: 1,
       __v: 1,
