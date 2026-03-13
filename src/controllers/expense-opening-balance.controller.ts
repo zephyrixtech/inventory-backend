@@ -62,13 +62,15 @@ export const listOpeningBalances = asyncHandler(async (req: Request, res: Respon
 
   const totalExpenseAmount = totalExpenses.length > 0 ? totalExpenses[0].total : 0;
 
+  // Calculate total of all opening balances
+  const totalOpeningBalance = balances.reduce((sum, balance) => sum + balance.amount, 0);
+  const totalRemainingBalance = totalOpeningBalance - totalExpenseAmount;
+
   const balancesWithCalculations = balances.map((balance) => ({
     _id: balance._id,
     amount: balance.amount,
     description: balance.description,
     date: balance.date,
-    totalExpenses: totalExpenseAmount,
-    remainingBalance: balance.amount - totalExpenseAmount,
     createdBy: balance.createdBy,
     updatedBy: balance.updatedBy,
     createdAt: balance.createdAt,
@@ -79,7 +81,12 @@ export const listOpeningBalances = asyncHandler(async (req: Request, res: Respon
     page: pageNum,
     limit: limitNum,
     total,
-    totalPages: Math.ceil(total / limitNum)
+    totalPages: Math.ceil(total / limitNum),
+    summary: {
+      totalOpeningBalance,
+      totalExpenses: totalExpenseAmount,
+      remainingBalance: totalRemainingBalance
+    }
   });
 });
 
