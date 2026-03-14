@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
+import { Types } from 'mongoose';
 
 import { PurchaseOrder } from '../models/purchase-order.model';
 import { StoreStock } from '../models/store-stock.model';
@@ -7,6 +8,7 @@ import { SalesInvoice } from '../models/sales-invoice.model';
 import { DailyExpense } from '../models/daily-expense.model';
 import { PackingList } from '../models/packing-list.model';
 import { Vendor } from '../models/vendor.model';
+import { Item } from '../models/item.model';
 import { ApiError } from '../utils/api-error';
 import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
@@ -154,4 +156,118 @@ export const getPackingListReport = asyncHandler(async (req: Request, res: Respo
   }
 
   return respond(res, StatusCodes.OK, packingLists);
+});
+
+export const getItemReport = asyncHandler(async (req: Request, res: Response) => {
+  const { from, to, itemIds } = req.query;
+
+  if (typeof itemIds !== 'string' || !itemIds.trim()) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'itemIds is required (comma-separated Mongo IDs)');
+  }
+
+  const rawIds = itemIds
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+  const rawIdSet = new Set(rawIds);
+
+  const invalidIds = rawIds.filter((id) => !Types.ObjectId.isValid(id));
+  if (invalidIds.length > 0) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, `Invalid itemIds: ${invalidIds.join(', ')}`);
+  }
+
+  const objectIds = rawIds.map((id) => new Types.ObjectId(id));
+
+  const itemDateRange = buildUtcDayRange(from, to);
+
+  const [items, packingLists, salesInvoices] = await Promise.all([
+    Item.find({ _id: { $in: objectIds } })
+      .populate('vendor', 'name')
+      .sort({ createdAt: -1 })
+      .lean(),
+    PackingList.find({
+      ...(itemDateRange ? { createdAt: itemDateRange } : {}),
+      'items.product': { $in: objectIds }
+    })
+      .sort({ createdAt: -1 })
+      .lean(),
+    SalesInvoice.find({
+      ...(itemDateRange ? { invoiceDate: itemDateRange } : {}),
+      'items.item': { $in: objectIds }
+    })
+      .populate('customer', 'name')
+      .sort({ invoiceDate: -1 })
+      .lean()
+  ]);
+
+  const packingByItem = new Map<
+    string,
+    { details: string[]; cargoNumbers: Set<string>; shipmentDates: Set<string> }
+  >();
+
+  for (const packingList of packingLists as any[]) {
+    const cargoNumber = (packingList as any).cargoNumber;
+    const shipmentDate = (packingList as any).shipmentDate
+      ? new Date((packingList as any).shipmentDate).toISOString()
+      : null;
+
+    for (const plItem of (packingList.items || []) as any[]) {
+      const productId = String(plItem.product);
+      if (!rawIdSet.has(productId)) continue;
+
+      const boxNumber = (packingList as any).boxNumber || '';
+      const size = (packingList as any).size ? ` (${(packingList as any).size})` : '';
+      const remark = (packingList as any).description ? ` - ${(packingList as any).description}` : '';
+      const qty = typeof plItem.quantity === 'number' ? plItem.quantity : 0;
+
+      const detail = `Box ${boxNumber}${size}${remark} • Qty ${qty}`;
+
+      const entry =
+        packingByItem.get(productId) ||
+        { details: [], cargoNumbers: new Set<string>(), shipmentDates: new Set<string>() };
+      entry.details.push(detail);
+      if (typeof cargoNumber === 'string' && cargoNumber.trim()) entry.cargoNumbers.add(cargoNumber.trim());
+      if (shipmentDate) entry.shipmentDates.add(shipmentDate);
+      packingByItem.set(productId, entry);
+    }
+  }
+
+  const customersByItem = new Map<string, Set<string>>();
+  for (const invoice of salesInvoices as any[]) {
+    const customerName =
+      (invoice as any)?.customer?.name || (invoice as any)?.customerName || (invoice as any)?.customer_name;
+
+    for (const invItem of (invoice.items || []) as any[]) {
+      const itemId = String(invItem.item);
+      if (!rawIdSet.has(itemId)) continue;
+
+      const set = customersByItem.get(itemId) || new Set<string>();
+      if (typeof customerName === 'string' && customerName.trim()) set.add(customerName.trim());
+      customersByItem.set(itemId, set);
+    }
+  }
+
+  const rows = (items as any[]).map((item) => {
+    const id = String(item._id);
+    const packing = packingByItem.get(id);
+    const customers = customersByItem.get(id);
+
+    const itemDate = item.purchaseDate || item.createdAt;
+    const latestShipmentDate = packing?.shipmentDates?.size
+      ? Array.from(packing.shipmentDates).sort().slice(-1)[0]
+      : null;
+
+    return {
+      itemId: id,
+      itemName: item.name || item.code || 'Unknown Item',
+      itemDate: itemDate ? new Date(itemDate).toISOString() : null,
+      supplierName: (item.vendor as any)?.name || null,
+      packingListDetails: packing?.details?.length ? packing.details.join('; ') : null,
+      cargoNumber: packing?.cargoNumbers?.size ? Array.from(packing.cargoNumbers).join(', ') : null,
+      shipmentDate: latestShipmentDate,
+      customerName: customers?.size ? Array.from(customers).join(', ') : null
+    };
+  });
+
+  return respond(res, StatusCodes.OK, rows);
 });

@@ -9,7 +9,8 @@ import {
   getSalesReport,
   getExpenseReport,
   getPackingListReport,
-  getCreditNotesReport
+  getCreditNotesReport,
+  getItemReport
 } from '../controllers/report.controller';
 
 const router = Router();
@@ -41,6 +42,17 @@ router.get(
   [query('from').optional().isISO8601(), query('to').optional().isISO8601()],
   validateRequest,
   getPackingListReport
+);
+
+router.get(
+  '/items',
+  [
+    query('from').optional().isISO8601(),
+    query('to').optional().isISO8601(),
+    query('itemIds').exists().isString()
+  ],
+  validateRequest,
+  getItemReport
 );
 
 export default router;
