@@ -14,7 +14,8 @@ router.post(
   [
     body('productId').isMongoId(),
     body('status').isIn(['approved', 'rejected', 'pending']),
-    body('damagedQuantity').optional().isFloat({ min: 0 })
+    body('damagedQuantity').optional().isFloat({ min: 0 }),
+    body('storeId').optional().isMongoId()
   ],
   validateRequest,
   submitQualityCheck
