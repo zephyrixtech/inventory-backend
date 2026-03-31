@@ -15,7 +15,7 @@ import {
 
 const router = Router();
 
-router.use(authenticate, authorize(['view_reports' , 'manage_packing']));
+router.use(authenticate, authorize(['view_reports']));
 
 router.get(
   '/purchases',

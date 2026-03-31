@@ -10,7 +10,7 @@ const ROLE_PERMISSION_FALLBACK: Record<string, string[]> = {
   superadmin: ['*'],
   admin: ['*'],
   purchaser: ['manage_purchases', 'manage_inventory', 'manage_packing', 'manage_qc', 'manage_suppliers', 'manage_expenses', 'view_reports'],
-  biller: ['manage_sales', 'manage_inventory', 'manage_expenses', 'manage_suppliers']
+  biller: ['manage_sales', 'manage_inventory', 'manage_expenses', 'manage_suppliers', 'view_reports']
 };
 
 const parseAuthHeader = (authorization?: string): string | null => {

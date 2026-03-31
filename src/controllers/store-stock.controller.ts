@@ -35,6 +35,7 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
   // Build the aggregation pipeline for role-based filtering
   const pipeline: any[] = [
     { $match: filters },
+    { $match: { quantity: { $ne: 0 } } },
     {
       $lookup: {
         from: 'stores',
@@ -178,6 +179,7 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
     StoreStock.aggregate(pipeline),
     StoreStock.aggregate([
       { $match: filters },
+      { $match: { quantity: { $ne: 0 } } },
       {
         $lookup: {
           from: 'stores',
