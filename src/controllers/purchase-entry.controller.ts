@@ -254,7 +254,7 @@ export const getPurchaseEntryStats = asyncHandler(async (req: Request, res: Resp
       $group: {
         _id: null,
         totalEntries: { $sum: 1 },
-        totalAmount: { $sum: '$finalAmount' },
+        totalAmount: { $sum: '$totalAmount' },
         totalPaid: { $sum: '$paidAmount' },
         totalBalance: { $sum: '$balanceAmount' },
         avgAmount: { $avg: '$finalAmount' }
