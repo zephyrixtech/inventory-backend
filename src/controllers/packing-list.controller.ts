@@ -86,13 +86,7 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
     throw ApiError.badRequest('User context missing');
   }
 
-  // Removed location field since we're removing location field
-  const { boxNumber, items, shipmentDate, packingDate, image1, image2, storeId, toStoreId, currency, exchangeRate, status, approvalStatus, cargoNumber, fabricDetails, size, description } = req.body;
-
-  const existing = await PackingList.findOne({ boxNumber });
-  if (existing) {
-    throw ApiError.conflict('Packing list with this box number already exists');
-  }
+  const { items, shipmentDate, image1, image2, storeId, toStoreId, currency, exchangeRate, status, approvalStatus, cargoNumber, fabricDetails, size, description } = req.body;
 
   if (!storeId) {
     throw ApiError.badRequest('Store ID is required');
@@ -127,11 +121,8 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
   }
 
   const packingList = await PackingList.create({
-    // Removed location field since we're removing location field
-    boxNumber,
     items: normalizedItems,
     shipmentDate,
-    packingDate,
     image1,
     image2,
     store: new Types.ObjectId(storeId),
@@ -139,9 +130,8 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
     currency: currency || 'INR',
     exchangeRate,
     status: status || 'india',
-    approvalStatus: approvalStatus || 'draft', // Default to draft
+    approvalStatus: approvalStatus || 'draft',
     createdBy: new Types.ObjectId(req.user.id),
-    // New fields
     cargoNumber,
     fabricDetails,
     size,
@@ -175,26 +165,14 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
     throw ApiError.notFound('Packing list not found');
   }
 
-  // Removed location field since we're removing location field
-  const { boxNumber, items, shipmentDate, packingDate, status, approvalStatus, image1, image2, storeId, toStoreId, currency, exchangeRate, cargoNumber, fabricDetails, size, description } = req.body;
+  const { items, shipmentDate, status, approvalStatus, image1, image2, storeId, toStoreId, currency, exchangeRate, cargoNumber, fabricDetails, size, description } = req.body;
 
-  if (boxNumber && boxNumber !== packingList.boxNumber) {
-    const existing = await PackingList.findOne({ boxNumber });
-    if (existing) {
-      throw ApiError.conflict('Packing list with this box number already exists');
-    }
-    packingList.boxNumber = boxNumber;
-  }
-
-  // Removed location update since we're removing location field
   if (shipmentDate) packingList.shipmentDate = shipmentDate;
-  if (packingDate) packingList.packingDate = packingDate;
   if (image1 !== undefined) packingList.image1 = image1;
   if (image2 !== undefined) packingList.image2 = image2;
   if (toStoreId) packingList.toStore = new Types.ObjectId(toStoreId);
   if (currency) packingList.currency = currency;
   if (exchangeRate) packingList.exchangeRate = exchangeRate;
-  // New fields
   if (cargoNumber !== undefined) packingList.cargoNumber = cargoNumber;
   if (fabricDetails !== undefined) packingList.fabricDetails = fabricDetails;
   if (size !== undefined) packingList.size = size;

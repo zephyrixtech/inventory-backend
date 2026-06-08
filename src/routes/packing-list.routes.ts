@@ -14,7 +14,6 @@ router.get('/', listPackingLists);
 router.post(
   '/',
   [
-    body('boxNumber').notEmpty(),
     body('items').isArray({ min: 1 }),
     body('items.*.productId').isMongoId(),
     body('items.*.quantity').isNumeric()
