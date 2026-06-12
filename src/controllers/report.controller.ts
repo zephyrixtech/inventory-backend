@@ -144,7 +144,14 @@ export const getPackingListReport = asyncHandler(async (req: Request, res: Respo
   }
 
   const packingLists = await PackingList.find(filters)
-    .populate('items.product', 'name code description')
+    .populate({
+      path: 'items.product',
+      select: 'name code description vendor',
+      populate: {
+        path: 'vendor',
+        select: 'name'
+      }
+    })
     .populate('store', 'name')
     .populate('toStore', 'name')
     .populate('createdBy', 'firstName lastName')

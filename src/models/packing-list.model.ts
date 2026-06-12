@@ -24,6 +24,7 @@ export interface PackingListDocument extends Document<Types.ObjectId> {
   approvedBy?: Types.ObjectId;
   approvedAt?: Date;
   cargoNumber?: string;
+  styleNumber?: string;
   fabricDetails?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -59,6 +60,7 @@ const packingListSchema = new Schema<PackingListDocument>(
     approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     approvedAt: { type: Date },
     cargoNumber: { type: String, trim: true },
+    styleNumber: { type: String, trim: true },
     fabricDetails: { type: String, trim: true },
     size: { type: String, trim: true },
     description: { type: String, trim: true }

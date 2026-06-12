@@ -59,11 +59,22 @@ export const listPackingLists = asyncHandler(async (req: Request, res: Response)
 
   // Removed location search since we're removing location field
   if (search && typeof search === 'string') {
-    filters.$or = [{ boxNumber: new RegExp(search, 'i') }];
+    filters.$or = [
+      { boxNumber: new RegExp(search, 'i') },
+      { cargoNumber: new RegExp(search, 'i') },
+      { styleNumber: new RegExp(search, 'i') }
+    ];
   }
 
   const query = PackingList.find(filters)
-    .populate('items.product', 'name code status')
+    .populate({
+      path: 'items.product',
+      select: 'name code status vendor',
+      populate: {
+        path: 'vendor',
+        select: 'name'
+      }
+    })
     .populate('createdBy', 'firstName lastName')
     .populate('store', 'name code')
     .populate('toStore', 'name code');
@@ -86,7 +97,7 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
     throw ApiError.badRequest('User context missing');
   }
 
-  const { items, shipmentDate, image1, image2, storeId, toStoreId, currency, exchangeRate, status, approvalStatus, cargoNumber, fabricDetails, size, description } = req.body;
+  const { items, shipmentDate, image1, image2, storeId, toStoreId, currency, exchangeRate, status, approvalStatus, cargoNumber, styleNumber, fabricDetails, size, description } = req.body;
 
   if (!storeId) {
     throw ApiError.badRequest('Store ID is required');
@@ -133,6 +144,7 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
     approvalStatus: approvalStatus || 'draft',
     createdBy: new Types.ObjectId(req.user.id),
     cargoNumber,
+    styleNumber,
     fabricDetails,
     size,
     description
@@ -144,7 +156,14 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
 export const getPackingList = asyncHandler(async (req: Request, res: Response) => {
 
   const packingList = await PackingList.findById(req.params.id)
-    .populate('items.product', 'name code status')
+    .populate({
+      path: 'items.product',
+      select: 'name code status vendor',
+      populate: {
+        path: 'vendor',
+        select: 'name'
+      }
+    })
     .populate('createdBy', 'firstName lastName')
     .populate('approvedBy', 'firstName lastName')
     .populate('store', 'name code')
@@ -165,7 +184,7 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
     throw ApiError.notFound('Packing list not found');
   }
 
-  const { items, shipmentDate, status, approvalStatus, image1, image2, storeId, toStoreId, currency, exchangeRate, cargoNumber, fabricDetails, size, description } = req.body;
+  const { items, shipmentDate, status, approvalStatus, image1, image2, storeId, toStoreId, currency, exchangeRate, cargoNumber, styleNumber, fabricDetails, size, description } = req.body;
 
   if (shipmentDate) packingList.shipmentDate = shipmentDate;
   if (image1 !== undefined) packingList.image1 = image1;
@@ -174,6 +193,7 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
   if (currency) packingList.currency = currency;
   if (exchangeRate) packingList.exchangeRate = exchangeRate;
   if (cargoNumber !== undefined) packingList.cargoNumber = cargoNumber;
+  if (styleNumber !== undefined) packingList.styleNumber = styleNumber;
   if (fabricDetails !== undefined) packingList.fabricDetails = fabricDetails;
   if (size !== undefined) packingList.size = size;
   if (description !== undefined) packingList.description = description;
@@ -268,7 +288,14 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
 
   // Populate the response with product information
   const updatedPackingList = await PackingList.findById(packingList._id)
-    .populate('items.product', 'name code status')
+    .populate({
+      path: 'items.product',
+      select: 'name code status vendor',
+      populate: {
+        path: 'vendor',
+        select: 'name'
+      }
+    })
     .populate('createdBy', 'firstName lastName')
     .populate('approvedBy', 'firstName lastName')
     .populate('toStore', 'name code');
@@ -299,7 +326,14 @@ export const approvePackingList = asyncHandler(async (req: Request, res: Respons
 
   // Populate the response with product information
   const updatedPackingList = await PackingList.findById(packingList._id)
-    .populate('items.product', 'name code status')
+    .populate({
+      path: 'items.product',
+      select: 'name code status vendor',
+      populate: {
+        path: 'vendor',
+        select: 'name'
+      }
+    })
     .populate('createdBy', 'firstName lastName')
     .populate('approvedBy', 'firstName lastName')
     .populate('store', 'name code')

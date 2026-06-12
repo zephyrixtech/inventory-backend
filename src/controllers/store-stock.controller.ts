@@ -84,6 +84,20 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
     },
     {
       $lookup: {
+        from: 'suppliers',
+        localField: 'productData.vendor',
+        foreignField: '_id',
+        as: 'vendorData'
+      }
+    },
+    {
+      $unwind: {
+        path: '$vendorData',
+        preserveNullAndEmptyArrays: true
+      }
+    },
+    {
+      $lookup: {
         from: 'users',
         localField: 'lastUpdatedBy',
         foreignField: '_id',
@@ -143,7 +157,11 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
         unitPrice: '$productData.unitPrice',
         currency: '$productData.currency',
         quantity: '$productData.quantity',
-        status: '$productData.status'
+        status: '$productData.status',
+        vendor: {
+          _id: '$vendorData._id',
+          name: '$vendorData.name'
+        }
       },
       store: {
         _id: '$storeData._id',
@@ -303,7 +321,14 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
 
   // Re-fetch to populate
   stock = await StoreStock.findById(stock._id)
-    .populate('product', 'name code currency unitPrice quantity status')
+    .populate({
+      path: 'product',
+      select: 'name code currency unitPrice quantity status vendor',
+      populate: {
+        path: 'vendor',
+        select: 'name'
+      }
+    })
     .populate('store', 'name code type');
 
   return respond(res, StatusCodes.OK, stock, { message: 'Store stock updated successfully' });
