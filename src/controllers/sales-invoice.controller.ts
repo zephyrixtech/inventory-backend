@@ -119,8 +119,8 @@ export const getSalesInvoice = asyncHandler(async (req: Request, res: Response) 
 
   // Removed company filter since we're removing company context
   const invoice = await SalesInvoice.findById(req.params.id)
-    .populate('customer', 'name email phone')
-    .populate('store', 'name code')
+    .populate('customer', 'name email phone billingAddress taxNumber')
+    .populate('store', 'name code address city state country phone email bankName bankAccountNumber ifscCode ibanCode taxCode')
     .populate('items.item', 'name code');
 
   if (!invoice) {
