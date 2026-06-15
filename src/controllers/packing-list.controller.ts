@@ -4,7 +4,7 @@ import { StatusCodes } from 'http-status-codes';
 
 import { PackingList } from '../models/packing-list.model';
 import { Item } from '../models/item.model';
-import { StoreStock } from '../models/store-stock.model';
+import { StoreStock, type StoreStockDocument } from '../models/store-stock.model';
 import { ApiError } from '../utils/api-error';
 import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
@@ -109,7 +109,8 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
 
   const normalizedItems = await normalizeItems(items ?? []);
 
-  // Reduce store stock quantities
+  // 1. Validate all stock availability first
+  const stocksToUpdate: Array<{ stock: StoreStockDocument; quantity: number }> = [];
   for (const item of normalizedItems) {
     const stock = await StoreStock.findOne({
       product: item.product,
@@ -126,11 +127,10 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
       );
     }
 
-    stock.quantity -= item.quantity;
-    stock.lastUpdatedBy = new Types.ObjectId(req.user.id);
-    await stock.save();
+    stocksToUpdate.push({ stock, quantity: item.quantity });
   }
 
+  // 2. Create the packing list
   const packingList = await PackingList.create({
     items: normalizedItems,
     shipmentDate,
@@ -149,6 +149,13 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
     size,
     description
   });
+
+  // 3. Only if packing list is created successfully, reduce the stock
+  for (const { stock, quantity } of stocksToUpdate) {
+    stock.quantity -= quantity;
+    stock.lastUpdatedBy = new Types.ObjectId(req.user.id);
+    await stock.save();
+  }
 
   return respond(res, StatusCodes.CREATED, packingList, { message: 'Packing list created successfully' });
 });
