@@ -69,7 +69,7 @@ export const listPackingLists = asyncHandler(async (req: Request, res: Response)
   const query = PackingList.find(filters)
     .populate({
       path: 'items.product',
-      select: 'name code status vendor',
+      select: 'name code status vendor unitPrice',
       populate: {
         path: 'vendor',
         select: 'name'
@@ -165,7 +165,7 @@ export const getPackingList = asyncHandler(async (req: Request, res: Response) =
   const packingList = await PackingList.findById(req.params.id)
     .populate({
       path: 'items.product',
-      select: 'name code status vendor',
+      select: 'name code status vendor unitPrice',
       populate: {
         path: 'vendor',
         select: 'name'
@@ -297,7 +297,7 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
   const updatedPackingList = await PackingList.findById(packingList._id)
     .populate({
       path: 'items.product',
-      select: 'name code status vendor',
+      select: 'name code status vendor unitPrice',
       populate: {
         path: 'vendor',
         select: 'name'
@@ -335,7 +335,7 @@ export const approvePackingList = asyncHandler(async (req: Request, res: Respons
   const updatedPackingList = await PackingList.findById(packingList._id)
     .populate({
       path: 'items.product',
-      select: 'name code status vendor',
+      select: 'name code status vendor unitPrice',
       populate: {
         path: 'vendor',
         select: 'name'
