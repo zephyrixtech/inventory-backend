@@ -209,11 +209,12 @@ export const getItemReport = asyncHandler(async (req: Request, res: Response) =>
 
   const packingByItem = new Map<
     string,
-    { details: string[]; cargoNumbers: Set<string>; shipmentDates: Set<string> }
+    { details: string[]; cargoNumbers: Set<string>; shipmentDates: Set<string>; styleNumbers: Set<string> }
   >();
 
   for (const packingList of packingLists as any[]) {
     const cargoNumber = (packingList as any).cargoNumber;
+    const styleNumber = (packingList as any).styleNumber;
     const shipmentDate = (packingList as any).shipmentDate
       ? new Date((packingList as any).shipmentDate).toISOString()
       : null;
@@ -222,18 +223,20 @@ export const getItemReport = asyncHandler(async (req: Request, res: Response) =>
       const productId = String(plItem.product);
       if (!rawIdSet.has(productId)) continue;
 
-      const boxNumber = (packingList as any).boxNumber || '';
-      const size = (packingList as any).size ? ` (${(packingList as any).size})` : '';
-      const remark = (packingList as any).description ? ` - ${(packingList as any).description}` : '';
+      const size = (packingList as any).size ? `${(packingList as any).size}` : '';
+      const sizeStr = size ? `Size: ${size}` : '';
+      const remark = (packingList as any).description ? `${(packingList as any).description}` : '';
+      const remarkStr = remark ? ` - ${remark}` : '';
       const qty = typeof plItem.quantity === 'number' ? plItem.quantity : 0;
 
-      const detail = `Box ${boxNumber}${size}${remark} • Qty ${qty}`;
+      const detail = [sizeStr, `Qty: ${qty}`].filter(Boolean).join(' • ') + remarkStr;
 
       const entry =
         packingByItem.get(productId) ||
-        { details: [], cargoNumbers: new Set<string>(), shipmentDates: new Set<string>() };
+        { details: [], cargoNumbers: new Set<string>(), shipmentDates: new Set<string>(), styleNumbers: new Set<string>() };
       entry.details.push(detail);
       if (typeof cargoNumber === 'string' && cargoNumber.trim()) entry.cargoNumbers.add(cargoNumber.trim());
+      if (typeof styleNumber === 'string' && styleNumber.trim()) entry.styleNumbers.add(styleNumber.trim());
       if (shipmentDate) entry.shipmentDates.add(shipmentDate);
       packingByItem.set(productId, entry);
     }
@@ -264,6 +267,10 @@ export const getItemReport = asyncHandler(async (req: Request, res: Response) =>
       ? Array.from(packing.shipmentDates).sort().slice(-1)[0]
       : null;
 
+    const styleNumbersStr = packing?.styleNumbers?.size
+      ? Array.from(packing.styleNumbers).join(', ')
+      : null;
+
     return {
       itemId: id,
       itemName: item.name || item.code || 'Unknown Item',
@@ -271,6 +278,7 @@ export const getItemReport = asyncHandler(async (req: Request, res: Response) =>
       supplierName: (item.vendor as any)?.name || null,
       packingListDetails: packing?.details?.length ? packing.details.join('; ') : null,
       cargoNumber: packing?.cargoNumbers?.size ? Array.from(packing.cargoNumbers).join(', ') : null,
+      styleNumber: styleNumbersStr,
       shipmentDate: latestShipmentDate,
       customerName: customers?.size ? Array.from(customers).join(', ') : null
     };
