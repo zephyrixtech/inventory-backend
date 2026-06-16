@@ -141,10 +141,12 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
       packingList: 1,
       shipmentDate: '$packingListData.shipmentDate',
       cargoNumber: '$packingListData.cargoNumber',
+      styleNumber: '$packingListData.styleNumber',
       packingListDetails: {
         _id: '$packingListData._id',
         shipmentDate: '$packingListData.shipmentDate',
-        cargoNumber: '$packingListData.cargoNumber'
+        cargoNumber: '$packingListData.cargoNumber',
+        styleNumber: '$packingListData.styleNumber'
       },
       createdAt: 1,
       updatedAt: 1,
