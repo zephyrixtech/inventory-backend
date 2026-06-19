@@ -13,6 +13,7 @@ export interface StoreStockDocument extends Document<Types.ObjectId> {
   lastUpdatedBy?: Types.ObjectId;
   unitPriceAED: number;
   packingList?: Types.ObjectId;
+  packingLists?: Types.ObjectId[];
   dpPrice?: number;
   exchangeRate?: number;
   finalPrice?: number;
@@ -30,6 +31,7 @@ const storeStockSchema = new Schema<StoreStockDocument>(
     lastUpdatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     unitPriceAED: { type: Number, default: 0, min: 0 },
     packingList: { type: Schema.Types.ObjectId, ref: 'PackingList' },
+    packingLists: { type: [{ type: Schema.Types.ObjectId, ref: 'PackingList' }], default: [] },
     dpPrice: { type: Number },
     exchangeRate: { type: Number },
     finalPrice: { type: Number },

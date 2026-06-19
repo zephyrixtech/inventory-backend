@@ -47,6 +47,7 @@ export interface ItemDocument extends Document {
 
   // Additional fields
   additionalAttributes?: Record<string, any>;
+  styleNumbers?: string[];
   videoType?: 'upload' | 'youtube';
   youtubeLink?: string | null;
   videoUrl?: string | null;
@@ -180,6 +181,10 @@ const itemSchema = new Schema<ItemDocument>(
     additionalAttributes: {
       type: Schema.Types.Mixed,
       default: {}
+    },
+    styleNumbers: {
+      type: [String],
+      default: []
     },
     videoType: {
       type: String,

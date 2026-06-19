@@ -3,6 +3,7 @@ import { StatusCodes } from 'http-status-codes';
 import { Types } from 'mongoose';
 
 import { Item } from '../models/item.model';
+import { PackingList } from '../models/packing-list.model';
 import { Vendor, type VendorDocument } from '../models/vendor.model';
 import { Supplier, type SupplierDocument } from '../models/supplier.model';
 import { ApiError } from '../utils/api-error';
@@ -25,7 +26,26 @@ export const listItem = asyncHandler(async (req: Request, res: Response) => {
   }
 
   if (search && typeof search === 'string') {
-    filters.$or = [{ name: new RegExp(search, 'i') }, { code: new RegExp(search, 'i') }];
+    // Collect all matching product IDs from packing lists for backward compatibility
+    const matchingPackingLists = await PackingList.find({
+      styleNumber: new RegExp(search, 'i')
+    }).select('items.product');
+
+    const productIdsFromPackingLists: Types.ObjectId[] = [];
+    for (const pl of matchingPackingLists) {
+      for (const item of pl.items) {
+        if (item.product) {
+          productIdsFromPackingLists.push(item.product as Types.ObjectId);
+        }
+      }
+    }
+
+    filters.$or = [
+      { name: new RegExp(search, 'i') },
+      { code: new RegExp(search, 'i') },
+      { styleNumbers: new RegExp(search, 'i') },
+      { _id: { $in: productIdsFromPackingLists } }
+    ];
   }
 
   if (vendor) {

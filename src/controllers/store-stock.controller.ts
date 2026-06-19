@@ -4,6 +4,7 @@ import { StatusCodes } from 'http-status-codes';
 
 import { StoreStock } from '../models/store-stock.model';
 import { Item } from '../models/item.model';
+import { PackingList } from '../models/packing-list.model';
 import { ApiError } from '../utils/api-error';
 import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
@@ -27,9 +28,29 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
 
   if (search && typeof search === 'string') {
     const matchingProducts = await Item.find({
-      $or: [{ name: new RegExp(search, 'i') }, { code: new RegExp(search, 'i') }]
+      $or: [
+        { name: new RegExp(search, 'i') },
+        { code: new RegExp(search, 'i') },
+        { styleNumbers: new RegExp(search, 'i') }
+      ]
     }).select('_id');
-    filters.product = { $in: matchingProducts.map((p) => p._id) };
+
+    const productIds = matchingProducts.map((p) => p._id);
+
+    // Dynamic backward-compatible lookup of packing list style numbers
+    const matchingPackingLists = await PackingList.find({
+      styleNumber: new RegExp(search, 'i')
+    }).select('items.product');
+
+    for (const pl of matchingPackingLists) {
+      for (const item of pl.items) {
+        if (item.product && !productIds.some(id => id.toString() === item.product.toString())) {
+          productIds.push(item.product as Types.ObjectId);
+        }
+      }
+    }
+
+    filters.product = { $in: productIds };
   }
 
   // Build the aggregation pipeline for role-based filtering
@@ -111,17 +132,21 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
       }
     },
     {
-      $lookup: {
-        from: 'packinglists',
-        localField: 'packingList',
-        foreignField: '_id',
-        as: 'packingListData'
+      $addFields: {
+        allPackingLists: {
+          $setUnion: [
+            { $cond: [ { $ifNull: ["$packingLists", null] }, "$packingLists", [] ] },
+            { $cond: [ { $ifNull: ["$packingList", null] }, ["$packingList"], [] ] }
+          ]
+        }
       }
     },
     {
-      $unwind: {
-        path: '$packingListData',
-        preserveNullAndEmptyArrays: true
+      $lookup: {
+        from: 'packinglists',
+        localField: 'allPackingLists',
+        foreignField: '_id',
+        as: 'packingListsData'
       }
     }
   );
@@ -139,14 +164,96 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
       exchangeRate: 1,
       finalPrice: 1,
       packingList: 1,
-      shipmentDate: '$packingListData.shipmentDate',
-      cargoNumber: '$packingListData.cargoNumber',
-      styleNumber: '$packingListData.styleNumber',
+      shipmentDate: { $max: "$packingListsData.shipmentDate" },
+      cargoNumber: {
+        $reduce: {
+          input: {
+            $filter: {
+              input: "$packingListsData.cargoNumber",
+              as: "cargo",
+              cond: { $gt: [ { $strLenCP: { $ifNull: ["$$cargo", ""] } }, 0 ] }
+            }
+          },
+          initialValue: "",
+          in: {
+            $cond: [
+              { $eq: ["$$value", ""] },
+              "$$this",
+              { $concat: ["$$value", ", ", "$$this"] }
+            ]
+          }
+        }
+      },
+      styleNumber: {
+        $reduce: {
+          input: {
+            $filter: {
+              input: {
+                $setUnion: [
+                  { $cond: [ { $isArray: "$productData.styleNumbers" }, "$productData.styleNumbers", [] ] },
+                  { $cond: [ { $isArray: "$packingListsData.styleNumber" }, "$packingListsData.styleNumber", [] ] }
+                ]
+              },
+              as: "style",
+              cond: { $gt: [ { $strLenCP: { $ifNull: ["$$style", ""] } }, 0 ] }
+            }
+          },
+          initialValue: "",
+          in: {
+            $cond: [
+              { $eq: ["$$value", ""] },
+              "$$this",
+              { $concat: ["$$value", ", ", "$$this"] }
+            ]
+          }
+        }
+      },
       packingListDetails: {
-        _id: '$packingListData._id',
-        shipmentDate: '$packingListData.shipmentDate',
-        cargoNumber: '$packingListData.cargoNumber',
-        styleNumber: '$packingListData.styleNumber'
+        _id: { $arrayElemAt: ["$packingListsData._id", 0] },
+        shipmentDate: { $max: "$packingListsData.shipmentDate" },
+        cargoNumber: {
+          $reduce: {
+            input: {
+              $filter: {
+                input: "$packingListsData.cargoNumber",
+                as: "cargo",
+                cond: { $gt: [ { $strLenCP: { $ifNull: ["$$cargo", ""] } }, 0 ] }
+              }
+            },
+            initialValue: "",
+            in: {
+              $cond: [
+                { $eq: ["$$value", ""] },
+                "$$this",
+                { $concat: ["$$value", ", ", "$$this"] }
+              ]
+            }
+          }
+        },
+        styleNumber: {
+          $reduce: {
+            input: {
+              $filter: {
+                input: {
+                  $setUnion: [
+                    { $cond: [ { $isArray: "$productData.styleNumbers" }, "$productData.styleNumbers", [] ] },
+                    { $cond: [ { $isArray: "$packingListsData.styleNumber" }, "$packingListsData.styleNumber", [] ] }
+                  ]
+                },
+                as: "style",
+                cond: { $gt: [ { $strLenCP: { $ifNull: ["$$style", ""] } }, 0 ] }
+              }
+            },
+            initialValue: "",
+            in: {
+              $cond: [
+                { $eq: ["$$value", ""] },
+                "$$this",
+                { $concat: ["$$value", ", ", "$$this"] }
+              ]
+            }
+          }
+        }
       },
       createdAt: 1,
       updatedAt: 1,
@@ -292,20 +399,29 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
   });
 
   if (stock) {
-    // If exists, increment quantity and update other fields
     stock.quantity += quantity;
     stock.margin = marginPercentage;
     stock.currency = selectedCurrency;
     stock.unitPrice = unitPrice || finalUnitPrice;
-    if (packingListId) stock.packingList = new Types.ObjectId(packingListId);
     if (dpPrice !== undefined) stock.dpPrice = dpPrice;
-    if (exchangeRate !== undefined) stock.exchangeRate = exchangeRate;
     if (finalPrice !== undefined) stock.finalPrice = finalPrice;
+    if (exchangeRate !== undefined) stock.exchangeRate = exchangeRate;
+    if (packingListId) {
+      const plObjectId = new Types.ObjectId(packingListId);
+      if (!stock.packingLists) stock.packingLists = [];
+      const existingPackingList = stock.packingList;
+      if (existingPackingList && !stock.packingLists.some(id => id.toString() === existingPackingList.toString())) {
+        stock.packingLists.push(existingPackingList);
+      }
+      stock.packingList = plObjectId;
+      if (!stock.packingLists.some(id => id.toString() === plObjectId.toString())) {
+        stock.packingLists.push(plObjectId);
+      }
+    }
     if (storeId) stock.store = new Types.ObjectId(storeId);
     stock.lastUpdatedBy = new Types.ObjectId(req.user.id);
     await stock.save();
   } else {
-    // If not exists, create new
     stock = await StoreStock.create({
       product: product._id,
       store: storeId ? new Types.ObjectId(storeId) : null,
@@ -314,6 +430,7 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
       currency: selectedCurrency,
       unitPrice: unitPrice || finalUnitPrice, // Use provided unitPrice (AED) if available
       packingList: packingListId ? new Types.ObjectId(packingListId) : undefined,
+      packingLists: packingListId ? [new Types.ObjectId(packingListId)] : [],
       dpPrice,
       exchangeRate,
       finalPrice,

@@ -267,9 +267,10 @@ export const getItemReport = asyncHandler(async (req: Request, res: Response) =>
       ? Array.from(packing.shipmentDates).sort().slice(-1)[0]
       : null;
 
-    const styleNumbersStr = packing?.styleNumbers?.size
-      ? Array.from(packing.styleNumbers).join(', ')
-      : null;
+    const itemStyleNumbers = Array.isArray(item.styleNumbers) ? item.styleNumbers : [];
+    const packingStyleNumbers = packing?.styleNumbers ? Array.from(packing.styleNumbers) : [];
+    const allStyleNumbers = Array.from(new Set([...itemStyleNumbers, ...packingStyleNumbers])).filter(Boolean);
+    const styleNumbersStr = allStyleNumbers.length ? allStyleNumbers.join(', ') : null;
 
     return {
       itemId: id,

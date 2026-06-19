@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
-
+import { Types } from 'mongoose';
+import { PackingList } from '../models/packing-list.model';
 import { Inventory } from '../models/inventory.model';
 import { Item } from '../models/item.model';
 import { Store } from '../models/store.model';
@@ -26,10 +27,29 @@ export const listInventory = asyncHandler(async (req: Request, res: Response) =>
 
   if (search && typeof search === 'string') {
     const matchingItems = await Item.find({
-      $or: [{ name: new RegExp(search, 'i') }, { code: new RegExp(search, 'i') }]
+      $or: [
+        { name: new RegExp(search, 'i') },
+        { code: new RegExp(search, 'i') },
+        { styleNumbers: new RegExp(search, 'i') }
+      ]
     }).select('_id');
 
-    filters.item = { $in: matchingItems.map((item) => item._id) };
+    const itemIds = matchingItems.map((item) => item._id);
+
+    // Dynamic backward-compatible lookup of packing list style numbers
+    const matchingPackingLists = await PackingList.find({
+      styleNumber: new RegExp(search, 'i')
+    }).select('items.product');
+
+    for (const pl of matchingPackingLists) {
+      for (const item of pl.items) {
+        if (item.product && !itemIds.some(id => id.toString() === item.product.toString())) {
+          itemIds.push(item.product as Types.ObjectId);
+        }
+      }
+    }
+
+    filters.item = { $in: itemIds };
   }
 
   const query = Inventory.find(filters)

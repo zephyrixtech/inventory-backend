@@ -157,6 +157,16 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
     await stock.save();
   }
 
+  // 4. Update the items with the new style number (if any)
+  if (styleNumber && typeof styleNumber === 'string' && styleNumber.trim()) {
+    const trimmedStyle = styleNumber.trim();
+    for (const item of normalizedItems) {
+      await Item.findByIdAndUpdate(item.product, {
+        $addToSet: { styleNumbers: trimmedStyle }
+      });
+    }
+  }
+
   return respond(res, StatusCodes.CREATED, packingList, { message: 'Packing list created successfully' });
 });
 
@@ -292,6 +302,16 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
   }
 
   await packingList.save();
+
+  // Update styleNumbers on the items in the packing list (if style number is present)
+  if (packingList.styleNumber && typeof packingList.styleNumber === 'string' && packingList.styleNumber.trim()) {
+    const trimmedStyle = packingList.styleNumber.trim();
+    for (const item of packingList.items) {
+      await Item.findByIdAndUpdate(item.product, {
+        $addToSet: { styleNumbers: trimmedStyle }
+      });
+    }
+  }
 
   // Populate the response with product information
   const updatedPackingList = await PackingList.findById(packingList._id)
