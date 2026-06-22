@@ -22,11 +22,12 @@ type NormalizedInvoiceItem = {
   vat: number; // VAT percentage
   vatAmount: number; // VAT amount in currency
   totalPrice: number;
+  styleNumber?: string;
 };
 
 const normalizeInvoiceItems = async (
   // Removed company context - changed parameter type
-  items: Array<{ itemId: string; description?: string; quantity: number; unitPrice: number; discount?: number; vat?: number }>
+  items: Array<{ itemId: string; description?: string; quantity: number; unitPrice: number; discount?: number; vat?: number; styleNumber?: string }>
 ) => {
   if (!Array.isArray(items) || items.length === 0) {
     throw ApiError.badRequest('At least one invoice item is required');
@@ -62,7 +63,8 @@ const normalizeInvoiceItems = async (
       discount: discountAmount,
       vat: vatPercentage,
       vatAmount: vatAmount,
-      totalPrice
+      totalPrice,
+      styleNumber: entry.styleNumber
     });
   }
 
@@ -99,7 +101,7 @@ export const listSalesInvoices = asyncHandler(async (req: Request, res: Response
   const query = SalesInvoice.find(filters)
     .populate('customer', 'name customerId email phone billingAddress')
     .populate('store', 'name code')
-    .populate('items.item', 'name code description');
+    .populate('items.item', 'name code description styleNumbers');
 
   if (sortBy) {
     query.sort({ [sortBy]: sortOrder === 'asc' ? 1 : -1 });
@@ -121,7 +123,7 @@ export const getSalesInvoice = asyncHandler(async (req: Request, res: Response) 
   const invoice = await SalesInvoice.findById(req.params.id)
     .populate('customer', 'name email phone billingAddress taxNumber')
     .populate('store', 'name code address city state country phone email bankName bankAccountNumber ifscCode ibanCode taxCode')
-    .populate('items.item', 'name code');
+    .populate('items.item', 'name code styleNumbers');
 
   if (!invoice) {
     throw ApiError.notFound('Sales invoice not found');
@@ -165,13 +167,17 @@ export const createSalesInvoice = asyncHandler(async (req: Request, res: Respons
 
   // Check stock availability and reduce stock quantities
   for (const item of normalizedItems) {
-    const stock = await StoreStock.findOne({
+    const stockQuery: any = {
       product: item.item,
       store: new Types.ObjectId(storeId)
-    });
+    };
+    if (item.styleNumber) {
+      stockQuery.styleNumber = item.styleNumber;
+    }
+    const stock = await StoreStock.findOne(stockQuery);
 
     if (!stock) {
-      throw ApiError.badRequest(`Stock not found for item in selected store`);
+      throw ApiError.badRequest(`Stock not found for item in selected store${item.styleNumber ? ` with style number ${item.styleNumber}` : ''}`);
     }
 
     if (stock.quantity < item.quantity) {
@@ -230,26 +236,32 @@ export const updateSalesInvoice = asyncHandler(async (req: Request, res: Respons
     // Get the store ID from the invoice
     const storeId = invoice.store.toString();
 
-    // Create a map of old items for easy lookup
+    // Create a map of old items for easy lookup (composite key: productID_styleNumber)
     const oldItemsMap = new Map<string, number>();
     invoice.items.forEach((item) => {
-      oldItemsMap.set(item.item.toString(), item.quantity);
+      const key = `${item.item.toString()}_${item.styleNumber || ''}`;
+      oldItemsMap.set(key, item.quantity);
     });
 
     // Process stock adjustments for updated items
-    const processedProductIds = new Set<string>();
+    const processedKeys = new Set<string>();
 
     for (const newItem of normalizedItems) {
       const productId = newItem.item.toString();
-      processedProductIds.add(productId);
-      const oldQty = oldItemsMap.get(productId) || 0;
+      const key = `${productId}_${newItem.styleNumber || ''}`;
+      processedKeys.add(key);
+      const oldQty = oldItemsMap.get(key) || 0;
       const diff = newItem.quantity - oldQty;
 
       if (diff !== 0) {
-        const stock = await StoreStock.findOne({
+        const stockQuery: any = {
           product: newItem.item,
           store: new Types.ObjectId(storeId)
-        });
+        };
+        if (newItem.styleNumber) {
+          stockQuery.styleNumber = newItem.styleNumber;
+        }
+        const stock = await StoreStock.findOne(stockQuery);
 
         if (!stock) {
           throw ApiError.badRequest(`Stock not found for item in selected store`);
@@ -272,13 +284,19 @@ export const updateSalesInvoice = asyncHandler(async (req: Request, res: Respons
     }
 
     // Handle removed items (add quantity back to stock)
-    for (const [productId, oldQty] of oldItemsMap.entries()) {
-      if (!processedProductIds.has(productId)) {
+    for (const [key, oldQty] of oldItemsMap.entries()) {
+      if (!processedKeys.has(key)) {
+        const [productId, styleNumber] = key.split('_');
+        
         // Item was removed from invoice, restore stock
-        const stock = await StoreStock.findOne({
+        const stockQuery: any = {
           product: new Types.ObjectId(productId),
           store: new Types.ObjectId(storeId)
-        });
+        };
+        if (styleNumber) {
+          stockQuery.styleNumber = styleNumber;
+        }
+        const stock = await StoreStock.findOne(stockQuery);
 
         if (stock) {
           stock.quantity += oldQty;
@@ -319,10 +337,14 @@ export const deleteSalesInvoice = asyncHandler(async (req: Request, res: Respons
   const storeId = invoice.store.toString();
 
   for (const item of invoice.items) {
-    const stock = await StoreStock.findOne({
+    const stockQuery: any = {
       product: item.item,
       store: new Types.ObjectId(storeId)
-    });
+    };
+    if (item.styleNumber) {
+      stockQuery.styleNumber = item.styleNumber;
+    }
+    const stock = await StoreStock.findOne(stockQuery);
 
     if (stock) {
       // Restore the quantity that was sold

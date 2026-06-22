@@ -27,30 +27,55 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
   }
 
   if (search && typeof search === 'string') {
-    const matchingProducts = await Item.find({
-      $or: [
-        { name: new RegExp(search, 'i') },
-        { code: new RegExp(search, 'i') },
-        { styleNumbers: new RegExp(search, 'i') }
-      ]
-    }).select('_id');
+    let productIds: Types.ObjectId[] = [];
+    if (req.query.styleOnly === 'true') {
+      const matchingProducts = await Item.find({
+        styleNumbers: new RegExp(search, 'i')
+      }).select('_id');
 
-    const productIds = matchingProducts.map((p) => p._id);
+      productIds = matchingProducts.map((p) => p._id);
 
-    // Dynamic backward-compatible lookup of packing list style numbers
-    const matchingPackingLists = await PackingList.find({
-      styleNumber: new RegExp(search, 'i')
-    }).select('items.product');
+      const matchingPackingLists = await PackingList.find({
+        styleNumber: new RegExp(search, 'i')
+      }).select('items.product');
 
-    for (const pl of matchingPackingLists) {
-      for (const item of pl.items) {
-        if (item.product && !productIds.some(id => id.toString() === item.product.toString())) {
-          productIds.push(item.product as Types.ObjectId);
+      for (const pl of matchingPackingLists) {
+        for (const item of pl.items) {
+          if (item.product && !productIds.some(id => id.toString() === item.product.toString())) {
+            productIds.push(item.product as Types.ObjectId);
+          }
         }
       }
-    }
 
-    filters.product = { $in: productIds };
+      filters.$or = [
+        { product: { $in: productIds } },
+        { styleNumber: new RegExp(search, 'i') }
+      ];
+    } else {
+      const matchingProducts = await Item.find({
+        $or: [
+          { name: new RegExp(search, 'i') },
+          { code: new RegExp(search, 'i') },
+          { styleNumbers: new RegExp(search, 'i') }
+        ]
+      }).select('_id');
+
+      productIds = matchingProducts.map((p) => p._id);
+
+      const matchingPackingLists = await PackingList.find({
+        styleNumber: new RegExp(search, 'i')
+      }).select('items.product');
+
+      for (const pl of matchingPackingLists) {
+        for (const item of pl.items) {
+          if (item.product && !productIds.some(id => id.toString() === item.product.toString())) {
+            productIds.push(item.product as Types.ObjectId);
+          }
+        }
+      }
+
+      filters.product = { $in: productIds };
+    }
   }
 
   // Build the aggregation pipeline for role-based filtering
@@ -185,28 +210,34 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
         }
       },
       styleNumber: {
-        $reduce: {
-          input: {
-            $filter: {
+        $cond: [
+          { $gt: [ { $strLenCP: { $ifNull: ["$styleNumber", ""] } }, 0 ] },
+          "$styleNumber",
+          {
+            $reduce: {
               input: {
-                $setUnion: [
-                  { $cond: [ { $isArray: "$productData.styleNumbers" }, "$productData.styleNumbers", [] ] },
-                  { $cond: [ { $isArray: "$packingListsData.styleNumber" }, "$packingListsData.styleNumber", [] ] }
-                ]
+                $filter: {
+                  input: {
+                    $setUnion: [
+                      { $cond: [ { $isArray: "$productData.styleNumbers" }, "$productData.styleNumbers", [] ] },
+                      { $cond: [ { $isArray: "$packingListsData.styleNumber" }, "$packingListsData.styleNumber", [] ] }
+                    ]
+                  },
+                  as: "style",
+                  cond: { $gt: [ { $strLenCP: { $ifNull: ["$$style", ""] } }, 0 ] }
+                }
               },
-              as: "style",
-              cond: { $gt: [ { $strLenCP: { $ifNull: ["$$style", ""] } }, 0 ] }
+              initialValue: "",
+              in: {
+                $cond: [
+                  { $eq: ["$$value", ""] },
+                  "$$this",
+                  { $concat: ["$$value", ", ", "$$this"] }
+                ]
+              }
             }
-          },
-          initialValue: "",
-          in: {
-            $cond: [
-              { $eq: ["$$value", ""] },
-              "$$this",
-              { $concat: ["$$value", ", ", "$$this"] }
-            ]
           }
-        }
+        ]
       },
       packingListDetails: {
         _id: { $arrayElemAt: ["$packingListsData._id", 0] },
@@ -231,28 +262,34 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
           }
         },
         styleNumber: {
-          $reduce: {
-            input: {
-              $filter: {
+          $cond: [
+            { $gt: [ { $strLenCP: { $ifNull: ["$styleNumber", ""] } }, 0 ] },
+            "$styleNumber",
+            {
+              $reduce: {
                 input: {
-                  $setUnion: [
-                    { $cond: [ { $isArray: "$productData.styleNumbers" }, "$productData.styleNumbers", [] ] },
-                    { $cond: [ { $isArray: "$packingListsData.styleNumber" }, "$packingListsData.styleNumber", [] ] }
-                  ]
+                  $filter: {
+                    input: {
+                      $setUnion: [
+                        { $cond: [ { $isArray: "$productData.styleNumbers" }, "$productData.styleNumbers", [] ] },
+                        { $cond: [ { $isArray: "$packingListsData.styleNumber" }, "$packingListsData.styleNumber", [] ] }
+                      ]
+                    },
+                    as: "style",
+                    cond: { $gt: [ { $strLenCP: { $ifNull: ["$$style", ""] } }, 0 ] }
+                  }
                 },
-                as: "style",
-                cond: { $gt: [ { $strLenCP: { $ifNull: ["$$style", ""] } }, 0 ] }
+                initialValue: "",
+                in: {
+                  $cond: [
+                    { $eq: ["$$value", ""] },
+                    "$$this",
+                    { $concat: ["$$value", ", ", "$$this"] }
+                  ]
+                }
               }
-            },
-            initialValue: "",
-            in: {
-              $cond: [
-                { $eq: ["$$value", ""] },
-                "$$this",
-                { $concat: ["$$value", ", ", "$$this"] }
-              ]
             }
-          }
+          ]
         }
       },
       createdAt: 1,
@@ -288,45 +325,25 @@ export const listStoreStock = asyncHandler(async (req: Request, res: Response) =
     }
   });
 
-  // Add sorting
-  if (sortBy) {
-    pipeline.push({ $sort: { [sortBy]: sortOrder === 'asc' ? 1 : -1 } });
-  } else {
-    pipeline.push({ $sort: { updatedAt: -1 } });
+  // Match computed styleNumber if styleOnly is true
+  if (search && typeof search === 'string' && req.query.styleOnly === 'true') {
+    pipeline.push({
+      $match: {
+        styleNumber: new RegExp(search, 'i')
+      }
+    });
   }
 
-  // Add pagination
-  pipeline.push(
-    { $skip: (page - 1) * limit },
-    { $limit: limit }
-  );
-
-  // Execute aggregation
+  // Execute aggregation: one with sort/skip/limit, one with count
   const [stock, totalResult] = await Promise.all([
-    StoreStock.aggregate(pipeline),
     StoreStock.aggregate([
-      { $match: filters },
-      { $match: { quantity: { $ne: 0 } } },
-      {
-        $lookup: {
-          from: 'stores',
-          localField: 'store',
-          foreignField: '_id',
-          as: 'storeData'
-        }
-      },
-      {
-        $unwind: {
-          path: '$storeData',
-          preserveNullAndEmptyArrays: true
-        }
-      },
-      // Apply same role-based filtering for count
-      ...(userRole && userRole !== 'admin' && userRole !== 'superadmin' ? [{
-        $match: {
-          [`storeData.${userRole === 'biller' ? 'biller' : userRole === 'purchaser' ? 'purchaser' : 'none'}`]: `ROLE_${userRole.toUpperCase()}`
-        }
-      }] : []),
+      ...pipeline,
+      ...(sortBy ? [{ $sort: { [sortBy]: sortOrder === 'asc' ? 1 : -1 } }] : [{ $sort: { updatedAt: -1 } }]),
+      { $skip: (page - 1) * limit },
+      { $limit: limit }
+    ]),
+    StoreStock.aggregate([
+      ...pipeline,
       { $count: 'total' }
     ])
   ]);
@@ -392,10 +409,20 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
     throw ApiError.badRequest('Currency must be either INR or AED');
   }
 
+  // Resolve style number if packing list is provided
+  let styleNumber: string | undefined;
+  if (packingListId) {
+    const pl = await PackingList.findById(packingListId);
+    if (pl) {
+      styleNumber = pl.styleNumber;
+    }
+  }
+
   // Check if stock exists
   let stock = await StoreStock.findOne({
     product: product._id,
-    store: storeId ? new Types.ObjectId(storeId) : null
+    store: storeId ? new Types.ObjectId(storeId) : null,
+    packingList: packingListId ? new Types.ObjectId(packingListId) : null
   });
 
   if (stock) {
@@ -406,6 +433,7 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
     if (dpPrice !== undefined) stock.dpPrice = dpPrice;
     if (finalPrice !== undefined) stock.finalPrice = finalPrice;
     if (exchangeRate !== undefined) stock.exchangeRate = exchangeRate;
+    if (styleNumber !== undefined) stock.styleNumber = styleNumber;
     if (packingListId) {
       const plObjectId = new Types.ObjectId(packingListId);
       if (!stock.packingLists) stock.packingLists = [];
@@ -434,6 +462,7 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
       dpPrice,
       exchangeRate,
       finalPrice,
+      styleNumber,
       lastUpdatedBy: new Types.ObjectId(req.user.id)
     });
   }

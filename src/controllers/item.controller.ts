@@ -40,12 +40,19 @@ export const listItem = asyncHandler(async (req: Request, res: Response) => {
       }
     }
 
-    filters.$or = [
-      { name: new RegExp(search, 'i') },
-      { code: new RegExp(search, 'i') },
-      { styleNumbers: new RegExp(search, 'i') },
-      { _id: { $in: productIdsFromPackingLists } }
-    ];
+    if (req.query.styleAndCodeOnly === 'true' || req.query.styleOnly === 'true') {
+      filters.$or = [
+        { styleNumbers: new RegExp(search, 'i') },
+        { _id: { $in: productIdsFromPackingLists } }
+      ];
+    } else {
+      filters.$or = [
+        { name: new RegExp(search, 'i') },
+        { code: new RegExp(search, 'i') },
+        { styleNumbers: new RegExp(search, 'i') },
+        { _id: { $in: productIdsFromPackingLists } }
+      ];
+    }
   }
 
   if (vendor) {

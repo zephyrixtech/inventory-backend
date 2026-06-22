@@ -17,6 +17,7 @@ export interface StoreStockDocument extends Document<Types.ObjectId> {
   dpPrice?: number;
   exchangeRate?: number;
   finalPrice?: number;
+  styleNumber?: string;
 }
 
 const storeStockSchema = new Schema<StoreStockDocument>(
@@ -35,13 +36,14 @@ const storeStockSchema = new Schema<StoreStockDocument>(
     dpPrice: { type: Number },
     exchangeRate: { type: Number },
     finalPrice: { type: Number },
+    styleNumber: { type: String, trim: true }
   },
   {
     timestamps: true
   }
 );
 
-storeStockSchema.index({ store: 1, product: 1 }, { unique: true });
+storeStockSchema.index({ store: 1, product: 1, packingList: 1 }, { unique: true });
 storeStockSchema.index({ packingList: 1 });
 
 export const StoreStock = model<StoreStockDocument>('StoreStock', storeStockSchema);

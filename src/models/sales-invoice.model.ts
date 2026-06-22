@@ -9,6 +9,7 @@ export interface SalesInvoiceItem {
   vat?: number; // VAT percentage (0-100)
   vatAmount?: number; // Calculated VAT amount in currency
   totalPrice: number;
+  styleNumber?: string;
 }
 
 export interface SalesInvoiceDocument extends Document<Types.ObjectId> {
@@ -38,7 +39,8 @@ const salesInvoiceItemSchema = new Schema<SalesInvoiceItem>(
     discount: { type: Number, default: 0, min: 0 },
     vat: { type: Number, default: 0, min: 0, max: 100 }, // VAT percentage
     vatAmount: { type: Number, default: 0, min: 0 }, // VAT amount in currency
-    totalPrice: { type: Number, required: true, min: 0 }
+    totalPrice: { type: Number, required: true, min: 0 },
+    styleNumber: { type: String, trim: true }
   },
   { _id: false }
 );

@@ -51,6 +51,18 @@ const run = async () => {
     await collection.dropIndex('company_1_store_1');
   }
 
+  const oldCompanyProductStoreIndex = indexes.find((idx) => idx.name === 'company_1_product_1_store_1');
+  if (oldCompanyProductStoreIndex) {
+    console.log('Dropping stale unique index company_1_product_1_store_1...');
+    await collection.dropIndex('company_1_product_1_store_1');
+  }
+
+  const oldCompanyStoreProductIndex = indexes.find((idx) => idx.name === 'company_1_store_1_product_1');
+  if (oldCompanyStoreProductIndex) {
+    console.log('Dropping stale unique index company_1_store_1_product_1...');
+    await collection.dropIndex('company_1_store_1_product_1');
+  }
+
   console.log('Checking duplicate rows for (store, product)...');
   const duplicates = await collection
     .aggregate<{
@@ -105,12 +117,20 @@ const run = async () => {
     console.log('No duplicate (store, product) rows found.');
   }
 
-  console.log('Creating unique compound index: { store: 1, product: 1 } ...');
+  const oldStoreProductIndex = indexes.find((idx) => idx.name === 'store_1_product_1');
+  if (oldStoreProductIndex) {
+    console.log('Dropping stale unique index store_1_product_1...');
+    await collection.dropIndex('store_1_product_1');
+  } else {
+    console.log('Stale unique index store_1_product_1 not present.');
+  }
+
+  console.log('Creating unique compound index: { store: 1, product: 1, packingList: 1 } ...');
   await collection.createIndex(
-    { store: 1, product: 1 },
+    { store: 1, product: 1, packingList: 1 },
     {
       unique: true,
-      name: 'store_1_product_1'
+      name: 'store_1_product_1_packingList_1'
     }
   );
 
