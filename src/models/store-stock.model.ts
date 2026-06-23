@@ -43,7 +43,7 @@ const storeStockSchema = new Schema<StoreStockDocument>(
   }
 );
 
-storeStockSchema.index({ store: 1, packingList: 1 }, { unique: true });
+storeStockSchema.index({ store: 1, packingList: 1 });
 storeStockSchema.index({ packingList: 1 });
 
 export const StoreStock = model<StoreStockDocument>('StoreStock', storeStockSchema);

@@ -274,9 +274,17 @@ export const getItemReport = asyncHandler(async (req: Request, res: Response) =>
 
     return {
       itemId: id,
+      itemCode: item.code || null,
       itemName: item.name || item.code || 'Unknown Item',
+      billNumber: item.billNumber || null,
       itemDate: itemDate ? new Date(itemDate).toISOString() : null,
       supplierName: (item.vendor as any)?.name || null,
+      quantity: typeof item.quantity === 'number' ? item.quantity : 0,
+      damagedQuantity: typeof item.damagedQuantity === 'number' ? item.damagedQuantity : 0,
+      unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : 0,
+      totalAmount: typeof item.totalPrice === 'number' ? item.totalPrice : (typeof item.quantity === 'number' && typeof item.unitPrice === 'number' ? item.quantity * item.unitPrice : 0),
+      paidAmount: item.additionalAttributes?.paidAmount || 0,
+      returnAmount: item.additionalAttributes?.returnAmount || 0,
       packingListDetails: packing?.details?.length ? packing.details.join('; ') : null,
       cargoNumber: packing?.cargoNumbers?.size ? Array.from(packing.cargoNumbers).join(', ') : null,
       styleNumber: styleNumbersStr,
