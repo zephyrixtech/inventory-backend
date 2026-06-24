@@ -10,7 +10,15 @@ export type PaginationParams = {
 
 export const getPaginationParams = (req: Request): PaginationParams => {
   const page = Math.max(Number(req.query.page) || 1, 1);
-  const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 100);
+  const rawLimit = req.query.limit;
+  let limit = 1000;
+
+  if (rawLimit !== 'all' && rawLimit !== '0') {
+    limit = Math.min(Math.max(Number(rawLimit) || 20, 1), 1000);
+  } else {
+    limit = 0;
+  }
+
   const sortBy = typeof req.query.sortBy === 'string' ? req.query.sortBy : undefined;
   const sortOrder = req.query.sortOrder === 'desc' ? 'desc' : 'asc';
 
@@ -19,8 +27,10 @@ export const getPaginationParams = (req: Request): PaginationParams => {
 
 export const paginateQuery = <T>(query: mongoose.Query<T[], T>, { page, limit, sortBy, sortOrder }: PaginationParams) => {
   if (sortBy) {
-    query.sort({ [sortBy]: sortOrder === 'asc' ? 1 : -1 });
+    query = query.sort({ [sortBy]: sortOrder === 'asc' ? 1 : -1 });
   }
-  return query.skip((page - 1) * limit).limit(limit);
+  if (limit && limit > 0) {
+    query = query.skip((page - 1) * limit).limit(limit);
+  }
+  return query;
 };
-
