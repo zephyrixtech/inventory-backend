@@ -10,6 +10,7 @@ import { respond } from '../utils/api-response';
 import { config } from '../config/env';
 import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
+import { logAudit } from '../utils/audit-logger';
 
 type ValidRole = 'superadmin' | 'admin' | 'purchaser' | 'biller';
 const VALID_ROLES: ValidRole[] = ['superadmin', 'admin', 'purchaser', 'biller'];
@@ -110,6 +111,14 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
     isActive: status === 'active'
   });
 
+  await logAudit(
+    req,
+    'User Management',
+    'User Creation',
+    user.email,
+    `User "${user.firstName} ${user.lastName}" (Role: ${user.role}) was created.`
+  );
+
   return respond(res, StatusCodes.CREATED, sanitizeUser(user), { message: 'User created successfully' });
 });
 
@@ -125,17 +134,29 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
   const updates: Record<string, unknown> = {};
   const { firstName, lastName, phone, status, role, password, email, failedAttempts } = req.body;
 
-  if (firstName) updates.firstName = firstName;
-  if (lastName) updates.lastName = lastName;
-  if (phone) updates.phone = phone;
-  if (status) {
+  const changedFields: string[] = [];
+  if (firstName && firstName !== user.firstName) {
+    changedFields.push(`firstName: "${user.firstName}" -> "${firstName}"`);
+    updates.firstName = firstName;
+  }
+  if (lastName && lastName !== user.lastName) {
+    changedFields.push(`lastName: "${user.lastName}" -> "${lastName}"`);
+    updates.lastName = lastName;
+  }
+  if (phone && phone !== user.phone) {
+    changedFields.push(`phone: "${user.phone}" -> "${phone}"`);
+    updates.phone = phone;
+  }
+  if (status && status !== user.status) {
+    changedFields.push(`status: "${user.status}" -> "${status}"`);
     updates.status = status;
     updates.isActive = status === 'active';
   }
-  if (role) {
+  if (role && role !== user.role) {
     if (!VALID_ROLES.includes(role as ValidRole)) {
       throw ApiError.badRequest('Invalid role');
     }
+    changedFields.push(`role: "${user.role}" -> "${role}"`);
     updates.role = role;
   }
   if (email && email !== user.email) {
@@ -143,17 +164,30 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
     if (emailInUse) {
       throw ApiError.conflict('Email already in use');
     }
+    changedFields.push(`email: "${user.email}" -> "${email}"`);
     updates.email = email;
   }
   if (password) {
+    changedFields.push('password was changed');
     updates.passwordHash = await bcrypt.hash(password, config.password.saltRounds);
   }
-  if (typeof failedAttempts === 'number') {
+  if (typeof failedAttempts === 'number' && failedAttempts !== user.failedAttempts) {
+    changedFields.push(`failedAttempts: ${user.failedAttempts} -> ${failedAttempts}`);
     updates.failedAttempts = failedAttempts;
   }
 
   Object.assign(user, updates);
   await user.save();
+
+  if (changedFields.length > 0) {
+    await logAudit(
+      req,
+      'User Management',
+      'User Update',
+      user.email,
+      `User "${user.firstName} ${user.lastName}" was updated: ${changedFields.join(', ')}.`
+    );
+  }
 
   return respond(res, StatusCodes.OK, sanitizeUser(user), { message: 'User updated successfully' });
 });
@@ -170,6 +204,14 @@ export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
   user.isActive = false;
   user.status = 'inactive';
   await user.save();
+
+  await logAudit(
+    req,
+    'User Management',
+    'User Deactivation',
+    user.email,
+    `User "${user.firstName} ${user.lastName}" was deactivated.`
+  );
 
   return respond(res, StatusCodes.OK, { success: true }, { message: 'User deactivated successfully' });
 });

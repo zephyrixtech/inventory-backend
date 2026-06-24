@@ -12,6 +12,7 @@ import { Item } from '../models/item.model';
 import { ApiError } from '../utils/api-error';
 import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
+import { logAudit } from '../utils/audit-logger';
 
 const buildUtcDayRange = (from?: unknown, to?: unknown): Record<string, Date> | null => {
   const range: Record<string, Date> = {};
@@ -51,6 +52,8 @@ export const getPurchaseReport = asyncHandler(async (req: Request, res: Response
     .populate('items.item', 'name code')
     .sort({ orderDate: -1 });
 
+  await logAudit(req, 'Reports', 'Purchase Report View', '-', 'Generated/Viewed Purchase Report.');
+
   return respond(res, StatusCodes.OK, purchaseOrders);
 });
 
@@ -59,6 +62,8 @@ export const getStockReport = asyncHandler(async (req: Request, res: Response) =
 
   // Removed company filter since we're removing company context
   const stock = await StoreStock.find().populate('product', 'name code quantity unitPrice currency status');
+
+  await logAudit(req, 'Reports', 'Stock Report View', '-', 'Generated/Viewed Stock Report.');
 
   return respond(res, StatusCodes.OK, stock);
 });
@@ -80,6 +85,8 @@ export const getSalesReport = asyncHandler(async (req: Request, res: Response) =
     .populate('items.item', 'name code')
     .sort({ invoiceDate: -1 });
 
+  await logAudit(req, 'Reports', 'Sales Report View', customerId as string || '-', `Generated/Viewed Sales Report.`);
+
   return respond(res, StatusCodes.OK, invoices);
 });
 
@@ -96,6 +103,8 @@ export const getExpenseReport = asyncHandler(async (req: Request, res: Response)
     .populate('supplier', 'name')
     .populate('createdBy', 'firstName lastName')
     .sort({ date: -1, createdAt: -1 });
+
+  await logAudit(req, 'Reports', 'Expense Report View', '-', 'Generated/Viewed Expense Report.');
 
   return respond(res, StatusCodes.OK, expenses);
 });
@@ -123,6 +132,8 @@ export const getCreditNotesReport = asyncHandler(async (req: Request, res: Respo
   const creditNotes = await Vendor.find(filters)
     .populate('createdBy', 'firstName lastName')
     .sort({ updatedAt: -1 });
+
+  await logAudit(req, 'Reports', 'Credit Notes Report View', '-', 'Generated/Viewed Credit Notes Report.');
 
   return respond(res, StatusCodes.OK, creditNotes);
 });
@@ -161,6 +172,8 @@ export const getPackingListReport = asyncHandler(async (req: Request, res: Respo
   if (packingLists.length > 0) {
     console.log('Sample packing list:', JSON.stringify(packingLists[0], null, 2));
   }
+
+  await logAudit(req, 'Reports', 'Packing List Report View', '-', 'Generated/Viewed Packing List Report.');
 
   return respond(res, StatusCodes.OK, packingLists);
 });
@@ -292,6 +305,8 @@ export const getItemReport = asyncHandler(async (req: Request, res: Response) =>
       customerName: customers?.size ? Array.from(customers).join(', ') : null
     };
   });
+
+  await logAudit(req, 'Reports', 'Item Report View', itemIds as string, `Generated/Viewed Item Report.`);
 
   return respond(res, StatusCodes.OK, rows);
 });

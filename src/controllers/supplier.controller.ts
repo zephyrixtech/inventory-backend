@@ -7,6 +7,7 @@ import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
 import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
+import { logAudit } from '../utils/audit-logger';
 
 export const listSuppliers = asyncHandler(async (req: Request, res: Response) => {
   const { status, contact, search } = req.query;
@@ -50,6 +51,8 @@ export const getSupplier = asyncHandler(async (req: Request, res: Response) => {
   if (!supplier) {
     throw ApiError.notFound('Supplier not found');
   }
+
+  await logAudit(req, 'Supplier Management', 'Supplier View', supplier.name, `Viewed supplier "${supplier.name}".`);
 
   return respond(res, StatusCodes.OK, supplier);
 });
@@ -120,6 +123,14 @@ export const createSupplier = asyncHandler(async (req: Request, res: Response) =
     const supplier = await Supplier.create(supplierData);
     console.log('Supplier created successfully:', supplier._id);
 
+    await logAudit(
+      req,
+      'Supplier Management',
+      'Supplier Creation',
+      supplier.name,
+      `Created supplier "${supplier.name}".`
+    );
+
     return respond(res, StatusCodes.CREATED, supplier, { message: 'Supplier created successfully' });
   } catch (error) {
     console.error('=== ERROR CREATING SUPPLIER ===');
@@ -162,27 +173,95 @@ export const updateSupplier = asyncHandler(async (req: Request, res: Response) =
     rating
   } = req.body;
 
-  if (name !== undefined) supplier.name = name;
-  if (email !== undefined) supplier.email = email;
-  if (phone !== undefined) supplier.phone = phone;
-  if (contactPerson !== undefined) supplier.contactPerson = contactPerson;
-  if (status !== undefined) supplier.status = status;
-  if (typeof isActive === 'boolean') supplier.isActive = isActive;
-  if (address !== undefined) supplier.address = address;
-  if (registrationNumber !== undefined) supplier.registrationNumber = registrationNumber;
-  if (website !== undefined) supplier.website = website;
-  if (city !== undefined) supplier.city = city;
-  if (state !== undefined) supplier.state = state;
-  if (postalCode !== undefined) supplier.postalCode = postalCode;
-  if (country !== undefined) supplier.country = country;
-  if (bankName !== undefined) supplier.bankName = bankName;
-  if (bank_account_number !== undefined) supplier.bank_account_number = bank_account_number;
-  if (ifscCode !== undefined) supplier.ifscCode = ifscCode;
-  if (ibanCode !== undefined) supplier.ibanCode = ibanCode;
-  if (description !== undefined) supplier.description = description;
-  if (rating !== undefined) supplier.rating = rating;
+  const changedFields: string[] = [];
+  if (name !== undefined && name !== supplier.name) {
+    changedFields.push(`name: "${supplier.name}" -> "${name}"`);
+    supplier.name = name;
+  }
+  if (email !== undefined && email !== supplier.email) {
+    changedFields.push(`email: "${supplier.email || ''}" -> "${email}"`);
+    supplier.email = email;
+  }
+  if (phone !== undefined && phone !== supplier.phone) {
+    changedFields.push(`phone: "${supplier.phone || ''}" -> "${phone}"`);
+    supplier.phone = phone;
+  }
+  if (contactPerson !== undefined && contactPerson !== supplier.contactPerson) {
+    changedFields.push(`contactPerson: "${supplier.contactPerson || ''}" -> "${contactPerson}"`);
+    supplier.contactPerson = contactPerson;
+  }
+  if (status !== undefined && status !== supplier.status) {
+    changedFields.push(`status: "${supplier.status}" -> "${status}"`);
+    supplier.status = status;
+  }
+  if (typeof isActive === 'boolean' && isActive !== supplier.isActive) {
+    changedFields.push(`isActive: ${supplier.isActive} -> ${isActive}`);
+    supplier.isActive = isActive;
+  }
+  if (address !== undefined && address !== supplier.address) {
+    changedFields.push(`address: updated`);
+    supplier.address = address;
+  }
+  if (registrationNumber !== undefined && registrationNumber !== supplier.registrationNumber) {
+    changedFields.push(`registrationNumber: "${supplier.registrationNumber || ''}" -> "${registrationNumber}"`);
+    supplier.registrationNumber = registrationNumber;
+  }
+  if (website !== undefined && website !== supplier.website) {
+    changedFields.push(`website: "${supplier.website || ''}" -> "${website}"`);
+    supplier.website = website;
+  }
+  if (city !== undefined && city !== supplier.city) {
+    changedFields.push(`city: "${supplier.city || ''}" -> "${city}"`);
+    supplier.city = city;
+  }
+  if (state !== undefined && state !== supplier.state) {
+    changedFields.push(`state: "${supplier.state || ''}" -> "${state}"`);
+    supplier.state = state;
+  }
+  if (postalCode !== undefined && postalCode !== supplier.postalCode) {
+    changedFields.push(`postalCode: "${supplier.postalCode || ''}" -> "${postalCode}"`);
+    supplier.postalCode = postalCode;
+  }
+  if (country !== undefined && country !== supplier.country) {
+    changedFields.push(`country: "${supplier.country || ''}" -> "${country}"`);
+    supplier.country = country;
+  }
+  if (bankName !== undefined && bankName !== supplier.bankName) {
+    changedFields.push(`bankName: "${supplier.bankName || ''}" -> "${bankName}"`);
+    supplier.bankName = bankName;
+  }
+  if (bank_account_number !== undefined && bank_account_number !== supplier.bank_account_number) {
+    changedFields.push(`bank_account_number: "${supplier.bank_account_number || ''}" -> "${bank_account_number}"`);
+    supplier.bank_account_number = bank_account_number;
+  }
+  if (ifscCode !== undefined && ifscCode !== supplier.ifscCode) {
+    changedFields.push(`ifscCode: "${supplier.ifscCode || ''}" -> "${ifscCode}"`);
+    supplier.ifscCode = ifscCode;
+  }
+  if (ibanCode !== undefined && ibanCode !== supplier.ibanCode) {
+    changedFields.push(`ibanCode: "${supplier.ibanCode || ''}" -> "${ibanCode}"`);
+    supplier.ibanCode = ibanCode;
+  }
+  if (description !== undefined && description !== supplier.description) {
+    changedFields.push(`description: updated`);
+    supplier.description = description;
+  }
+  if (rating !== undefined && rating !== supplier.rating) {
+    changedFields.push(`rating: ${supplier.rating || 0} -> ${rating}`);
+    supplier.rating = rating;
+  }
 
   await supplier.save();
+
+  if (changedFields.length > 0) {
+    await logAudit(
+      req,
+      'Supplier Management',
+      'Supplier Update',
+      supplier.name,
+      `Updated supplier "${supplier.name}": ${changedFields.join(', ')}.`
+    );
+  }
 
   return respond(res, StatusCodes.OK, supplier, { message: 'Supplier updated successfully' });
 });
@@ -195,6 +274,14 @@ export const deleteSupplier = asyncHandler(async (req: Request, res: Response) =
   }
 
   await Supplier.deleteOne({ _id: supplier._id });
+
+  await logAudit(
+    req,
+    'Supplier Management',
+    'Supplier Deletion',
+    supplier.name,
+    `Deleted supplier "${supplier.name}".`
+  );
 
   return respond(res, StatusCodes.OK, { success: true }, { message: 'Supplier deleted successfully' });
 });

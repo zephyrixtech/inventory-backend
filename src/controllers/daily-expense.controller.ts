@@ -9,6 +9,7 @@ import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
 import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
+import { logAudit } from '../utils/audit-logger';
 
 export const listDailyExpenses = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {
@@ -96,6 +97,14 @@ export const createDailyExpense = asyncHandler(async (req: Request, res: Respons
   // Populate supplier name in response
   const populatedExpense = await DailyExpense.findById(expense._id).populate('supplier', 'name');
 
+  await logAudit(
+    req,
+    'Expense Management',
+    'Expense Creation',
+    expense._id.toString(),
+    `Created daily expense of ${expense.amount} AED (Type: ${expense.type}, Payment: ${expense.paymentType}).`
+  );
+
   return respond(res, StatusCodes.CREATED, populatedExpense, { message: 'Expense recorded successfully' });
 });
 
@@ -141,18 +150,49 @@ export const updateDailyExpense = asyncHandler(async (req: Request, res: Respons
     }
   }
 
-  // Update fields
-  if (supplierId !== undefined) expense.supplier = supplier ? supplier._id : undefined;
-  if (description !== undefined) expense.description = description;
-  if (amount !== undefined) expense.amount = amount;
-  if (date !== undefined) expense.date = date;
-  if (type !== undefined) expense.type = type;
-  if (paymentType !== undefined) expense.paymentType = paymentType;
-  if (transactionId !== undefined) expense.transactionId = transactionId;
+  const changedFields: string[] = [];
+  if (supplierId !== undefined && supplierId !== (expense.supplier ? expense.supplier.toString() : undefined)) {
+    changedFields.push(`supplier: updated`);
+    expense.supplier = supplier ? supplier._id : undefined;
+  }
+  if (description !== undefined && description !== expense.description) {
+    changedFields.push(`description: "${expense.description || ''}" -> "${description}"`);
+    expense.description = description;
+  }
+  if (amount !== undefined && amount !== expense.amount) {
+    changedFields.push(`amount: ${expense.amount} -> ${amount}`);
+    expense.amount = amount;
+  }
+  if (date !== undefined && new Date(date).getTime() !== new Date(expense.date).getTime()) {
+    changedFields.push(`date: updated`);
+    expense.date = date;
+  }
+  if (type !== undefined && type !== expense.type) {
+    changedFields.push(`type: "${expense.type}" -> "${type}"`);
+    expense.type = type;
+  }
+  if (paymentType !== undefined && paymentType !== expense.paymentType) {
+    changedFields.push(`paymentType: "${expense.paymentType}" -> "${paymentType}"`);
+    expense.paymentType = paymentType;
+  }
+  if (transactionId !== undefined && transactionId !== expense.transactionId) {
+    changedFields.push(`transactionId: "${expense.transactionId || ''}" -> "${transactionId}"`);
+    expense.transactionId = transactionId;
+  }
 
   await expense.save();
 
   const populatedExpense = await DailyExpense.findById(expense._id).populate('supplier', 'name');
+
+  if (changedFields.length > 0) {
+    await logAudit(
+      req,
+      'Expense Management',
+      'Expense Update',
+      expense._id.toString(),
+      `Updated expense "${expense._id}": ${changedFields.join(', ')}.`
+    );
+  }
 
   return respond(res, StatusCodes.OK, populatedExpense, { message: 'Expense updated successfully' });
 });
@@ -180,7 +220,16 @@ export const deleteDailyExpense = asyncHandler(async (req: Request, res: Respons
     throw ApiError.notFound('Expense not found or you do not have permission to delete it');
   }
 
+  const expenseAmount = expense.amount;
   await expense.deleteOne();
+
+  await logAudit(
+    req,
+    'Expense Management',
+    'Expense Deletion',
+    req.params.id,
+    `Deleted expense of ${expenseAmount} AED.`
+  );
 
   return respond(res, StatusCodes.OK, { success: true }, { message: 'Expense removed successfully' });
 });

@@ -9,6 +9,7 @@ import { StoreStock } from '../models/store-stock.model';
 import { ApiError } from '../utils/api-error';
 import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
+import { logAudit } from '../utils/audit-logger';
 
 export const submitQualityCheck = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {
@@ -92,10 +93,22 @@ export const submitQualityCheck = asyncHandler(async (req: Request, res: Respons
     product.availableQuantity = Math.max(0, totalQty - sanitizedDamagedQuantity);
   }
 
+  const oldQcStatus = previousQcRecord?.status || 'pending';
+
   product.status =
     status === 'approved' ? 'store_pending' : status === 'rejected' ? 'qc_failed' : 'pending_qc';
 
   await product.save();
+
+  // Log activity
+  let qcDetails = `Quality check status for "${product.name}" updated from "${oldQcStatus}" to "${status}".`;
+  if (sanitizedDamagedQuantity !== undefined) {
+    qcDetails += ` Damaged quantity: ${sanitizedDamagedQuantity}. Available quantity: ${product.availableQuantity}.`;
+  }
+  if (remarks) {
+    qcDetails += ` Remarks: "${remarks}".`;
+  }
+  await logAudit(req, 'Quality Control', 'QC Status Update', product.code, qcDetails);
 
   if (status === 'approved' && !wasPreviouslyApproved) {
     if (!storeId) {
@@ -147,6 +160,14 @@ export const getQualityCheck = asyncHandler(async (req: Request, res: Response) 
   if (!record) {
     throw ApiError.notFound('Quality check record not found');
   }
+
+  await logAudit(
+    req,
+    'Quality Control',
+    'QC View',
+    record._id.toString(),
+    `Viewed QC details for product ID: "${req.params.productId}".`
+  );
 
   return respond(res, StatusCodes.OK, record);
 });

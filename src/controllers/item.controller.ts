@@ -11,6 +11,7 @@ import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
 import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
+import { logAudit } from '../utils/audit-logger';
 
 export const listItem = asyncHandler(async (req: Request, res: Response) => {
   // Removed company context check since we're removing company context
@@ -87,6 +88,14 @@ export const getItem = asyncHandler(async (req: Request, res: Response) => {
   if (!item) {
     throw ApiError.notFound('Item not found');
   }
+
+  await logAudit(
+    req,
+    'Inventory',
+    'Item View',
+    item.code,
+    `Viewed details of item "${item.name}" (Code: ${item.code}).`
+  );
 
   return respond(res, StatusCodes.OK, item);
 });
@@ -203,6 +212,15 @@ export const createItem = asyncHandler(async (req: Request, res: Response) => {
   // Populate vendor name for the response
   await item.populate('vendor', '_id name');
 
+  // Log activity
+  await logAudit(
+    req,
+    'Inventory',
+    'Item Creation',
+    item.code,
+    `Created item "${item.name}" with quantity ${item.quantity || 0} under Bill ${item.billNumber}.`
+  );
+
   return respond(res, StatusCodes.CREATED, item, {
     message: 'Item created successfully'
   });
@@ -273,6 +291,9 @@ export const updateItem = asyncHandler(async (req: Request, res: Response) => {
     itemDoc.code = code;
   }
 
+  const oldQty = itemDoc.quantity || 0;
+  const oldStatus = itemDoc.status;
+
   // Update fields
   if (name !== undefined) itemDoc.name = name;
   if (description !== undefined) itemDoc.description = description;
@@ -290,6 +311,16 @@ export const updateItem = asyncHandler(async (req: Request, res: Response) => {
   await itemDoc.save();
   await itemDoc.populate('vendor', '_id name');
 
+  // Log activity
+  let logDetails = `Updated item "${itemDoc.name}".`;
+  if (quantity !== undefined && quantity !== oldQty) {
+    logDetails += ` Quantity changed from ${oldQty} to ${quantity}.`;
+  }
+  if (status !== undefined && status !== oldStatus) {
+    logDetails += ` Status changed from "${oldStatus}" to "${status}".`;
+  }
+  await logAudit(req, 'Inventory', 'Item Update', itemDoc.code, logDetails);
+
   return respond(res, StatusCodes.OK, itemDoc, { message: 'Item updated successfully' });
 });
 
@@ -303,6 +334,15 @@ export const deleteItem = asyncHandler(async (req: Request, res: Response) => {
   }
 
   await Item.deleteOne({ _id: item._id });
+
+  // Log activity
+  await logAudit(
+    req,
+    'Inventory',
+    'Item Deletion',
+    item.code,
+    `Deleted item "${item.name}" (Code: ${item.code}).`
+  );
 
   return respond(res, StatusCodes.OK, { success: true }, { message: 'Item deleted successfully' });
 });

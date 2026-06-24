@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import bcrypt from 'bcryptjs';
+import { logAudit } from '../utils/audit-logger';
 
 import { Company } from '../models/company.model';
 import { User } from '../models/user.model';
@@ -133,6 +134,27 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
   // Handle role properly based on the user model definition
   const roleInfo = user.role || 'biller';
+
+  // Log activity
+  const mockReq = {
+    headers: req.headers,
+    socket: req.socket,
+    user: {
+      id: user._id.toString(),
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role: roleInfo,
+      permissions: []
+    }
+  } as any;
+  await logAudit(
+    mockReq,
+    'User Management',
+    'Login',
+    user.email,
+    `User "${user.firstName} ${user.lastName}" logged in successfully.`
+  );
 
   // Get role permissions based on role
   let permissions: string[] = [];
@@ -350,6 +372,15 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
 
   user.passwordHash = await bcrypt.hash(newPassword, config.password.saltRounds);
   await user.save();
+
+  // Log activity
+  await logAudit(
+    req,
+    'User Management',
+    'Password Change',
+    user.email,
+    `User "${user.firstName} ${user.lastName}" changed their password.`
+  );
 
   return respond(res, StatusCodes.OK, { success: true }, { message: 'Password updated successfully' });
 });

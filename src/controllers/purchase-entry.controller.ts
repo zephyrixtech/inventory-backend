@@ -8,6 +8,7 @@ import { respond } from '../utils/api-response';
 import { ApiError } from '../utils/api-error';
 import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
+import { logAudit } from '../utils/audit-logger';
 
 // Generate purchase code
 const generatePurchaseCode = async (): Promise<string> => {
@@ -97,6 +98,14 @@ export const createPurchaseEntry = asyncHandler(async (req: Request, res: Respon
     { path: 'createdBy', select: 'first_name last_name' }
   ]);
 
+  await logAudit(
+    req,
+    'Purchase Management',
+    'Purchase Entry Creation',
+    purchaseEntry.purchaseCode,
+    `Created purchase entry with Bill Number: "${purchaseEntry.billNumber}", Supplier: "${(purchaseEntry.supplier as any)?.name || 'Unknown'}", Total Amount: ${purchaseEntry.totalAmount}.`
+  );
+
   return respond(res, StatusCodes.CREATED, purchaseEntry);
 });
 
@@ -153,6 +162,14 @@ export const getPurchaseEntryById = asyncHandler(async (req: Request, res: Respo
     throw ApiError.notFound('Purchase entry not found');
   }
 
+  await logAudit(
+    req,
+    'Purchase Management',
+    'Purchase Entry View',
+    purchaseEntry.purchaseCode,
+    `Viewed details of purchase entry "${purchaseEntry.purchaseCode}".`
+  );
+
   return respond(res, StatusCodes.OK, purchaseEntry);
 });
 
@@ -170,13 +187,18 @@ export const updatePurchaseEntry = asyncHandler(async (req: Request, res: Respon
     throw ApiError.notFound('Purchase entry not found');
   }
 
+  const changedFields: string[] = [];
+
   // Validate supplier if provided
   if (supplier) {
     const supplierDoc = await Supplier.findOne({ _id: supplier, isActive: true });
     if (!supplierDoc) {
       throw ApiError.notFound('Supplier not found');
     }
-    purchaseEntry.supplier = supplier;
+    if (purchaseEntry.supplier.toString() !== supplier) {
+      changedFields.push(`supplier: updated`);
+      purchaseEntry.supplier = supplier;
+    }
   }
 
   // Update items if provided
@@ -200,16 +222,38 @@ export const updatePurchaseEntry = asyncHandler(async (req: Request, res: Respon
       });
     }
 
+    changedFields.push(`items list: updated`);
     purchaseEntry.items = validatedItems;
   }
 
   // Update other fields
-  if (billNumber) purchaseEntry.billNumber = billNumber;
-  if (date) purchaseEntry.date = new Date(date);
-  if (totalAmount !== undefined) purchaseEntry.totalAmount = totalAmount;
-  if (discount !== undefined) purchaseEntry.discount = discount;
-  if (paidAmount !== undefined) purchaseEntry.paidAmount = paidAmount;
-  if (notes !== undefined) purchaseEntry.notes = notes;
+  if (billNumber && billNumber !== purchaseEntry.billNumber) {
+    changedFields.push(`billNumber: "${purchaseEntry.billNumber}" -> "${billNumber}"`);
+    purchaseEntry.billNumber = billNumber;
+  }
+  if (date) {
+    const newDate = new Date(date);
+    if (newDate.getTime() !== purchaseEntry.date.getTime()) {
+      changedFields.push(`date: "${purchaseEntry.date.toISOString()}" -> "${newDate.toISOString()}"`);
+      purchaseEntry.date = newDate;
+    }
+  }
+  if (totalAmount !== undefined && totalAmount !== purchaseEntry.totalAmount) {
+    changedFields.push(`totalAmount: ${purchaseEntry.totalAmount} -> ${totalAmount}`);
+    purchaseEntry.totalAmount = totalAmount;
+  }
+  if (discount !== undefined && discount !== purchaseEntry.discount) {
+    changedFields.push(`discount: ${purchaseEntry.discount} -> ${discount}`);
+    purchaseEntry.discount = discount;
+  }
+  if (paidAmount !== undefined && paidAmount !== purchaseEntry.paidAmount) {
+    changedFields.push(`paidAmount: ${purchaseEntry.paidAmount} -> ${paidAmount}`);
+    purchaseEntry.paidAmount = paidAmount;
+  }
+  if (notes !== undefined && notes !== purchaseEntry.notes) {
+    changedFields.push(`notes: "${purchaseEntry.notes || ''}" -> "${notes}"`);
+    purchaseEntry.notes = notes;
+  }
 
   // Recalculate amounts
   purchaseEntry.finalAmount = purchaseEntry.totalAmount - purchaseEntry.discount;
@@ -223,6 +267,16 @@ export const updatePurchaseEntry = asyncHandler(async (req: Request, res: Respon
     { path: 'items.item', select: 'name code description' },
     { path: 'createdBy', select: 'first_name last_name' }
   ]);
+
+  if (changedFields.length > 0) {
+    await logAudit(
+      req,
+      'Purchase Management',
+      'Purchase Entry Update',
+      purchaseEntry.purchaseCode,
+      `Updated purchase entry "${purchaseEntry.purchaseCode}": ${changedFields.join(', ')}.`
+    );
+  }
 
   return respond(res, StatusCodes.OK, purchaseEntry);
 });
@@ -242,6 +296,14 @@ export const deletePurchaseEntry = asyncHandler(async (req: Request, res: Respon
 
   purchaseEntry.isActive = false;
   await purchaseEntry.save();
+
+  await logAudit(
+    req,
+    'Purchase Management',
+    'Purchase Entry Deletion',
+    purchaseEntry.purchaseCode,
+    `Deleted purchase entry "${purchaseEntry.purchaseCode}" (marked inactive).`
+  );
 
   return respond(res, StatusCodes.OK, { success: true });
 });

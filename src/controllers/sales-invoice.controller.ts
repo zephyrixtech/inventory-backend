@@ -10,6 +10,7 @@ import { StoreStock } from '../models/store-stock.model';
 import { ApiError } from '../utils/api-error';
 import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
+import { logAudit } from '../utils/audit-logger';
 import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
 
@@ -129,6 +130,14 @@ export const getSalesInvoice = asyncHandler(async (req: Request, res: Response) 
     throw ApiError.notFound('Sales invoice not found');
   }
 
+  await logAudit(
+    req,
+    'Sales',
+    'Invoice View',
+    invoice.invoiceNumber,
+    `Viewed sales invoice details (Invoice Number: "${invoice.invoiceNumber}", Customer: "${(invoice.customer as any)?.name || 'Unknown'}").`
+  );
+
   return respond(res, StatusCodes.OK, invoice);
 });
 
@@ -209,6 +218,15 @@ export const createSalesInvoice = asyncHandler(async (req: Request, res: Respons
     createdBy: req.user ? new Types.ObjectId(req.user.id) : undefined,
     items: normalizedItems
   });
+
+  // Log activity
+  await logAudit(
+    req,
+    'Sales',
+    'Invoice Generation',
+    invoice.invoiceNumber,
+    `Generated sales invoice "${invoice.invoiceNumber}" for customer "${customer.name}". Net Amount: ${invoice.netAmount}.`
+  );
 
   return respond(res, StatusCodes.CREATED, invoice, { message: 'Sales invoice created successfully' });
 });
@@ -320,6 +338,15 @@ export const updateSalesInvoice = asyncHandler(async (req: Request, res: Respons
 
   await invoice.save();
 
+  // Log activity
+  await logAudit(
+    req,
+    'Sales',
+    'Invoice Update',
+    invoice.invoiceNumber,
+    `Updated sales invoice "${invoice.invoiceNumber}". Net Amount: ${invoice.netAmount}.`
+  );
+
   return respond(res, StatusCodes.OK, invoice, { message: 'Sales invoice updated successfully' });
 });
 
@@ -355,6 +382,15 @@ export const deleteSalesInvoice = asyncHandler(async (req: Request, res: Respons
       await stock.save();
     }
   }
+
+  // Log activity
+  await logAudit(
+    req,
+    'Sales',
+    'Invoice Deletion',
+    invoice.invoiceNumber,
+    `Deleted sales invoice "${invoice.invoiceNumber}" and restored store stock.`
+  );
 
   await invoice.deleteOne();
 

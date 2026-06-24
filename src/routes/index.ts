@@ -23,6 +23,7 @@ import reportRoutes from './report.routes';
 import companyAdministrationRoutes from './company-administration.routes';
 import purchaseEntryRoutes from './purchase-entry.routes';
 import stockTransferRoutes from './stock-transfer.routes';
+import auditLogRoutes from './audit-log.routes';
 
 const apiRouter = Router();
 
@@ -49,5 +50,6 @@ apiRouter.use('/reports', reportRoutes);
 apiRouter.use('/company-administration', companyAdministrationRoutes);
 apiRouter.use('/purchase-entries', purchaseEntryRoutes);
 apiRouter.use('/stock-transfers', stockTransferRoutes);
+apiRouter.use('/audit-logs', auditLogRoutes);
 
 export default apiRouter;

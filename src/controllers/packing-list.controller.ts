@@ -10,6 +10,7 @@ import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
 import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
+import { logAudit } from '../utils/audit-logger';
 
 const normalizeItems = async (
   items: Array<{ productId: string; quantity: number; description?: string; unitOfMeasure?: string }>
@@ -167,6 +168,15 @@ export const createPackingList = asyncHandler(async (req: Request, res: Response
     }
   }
 
+  // Log activity
+  await logAudit(
+    req,
+    'Packing List',
+    'Packing List Creation',
+    packingList.styleNumber || packingList.cargoNumber || packingList._id.toString(),
+    `Created packing list with Cargo: "${packingList.cargoNumber || ''}" and Style: "${packingList.styleNumber || ''}".`
+  );
+
   return respond(res, StatusCodes.CREATED, packingList, { message: 'Packing list created successfully' });
 });
 
@@ -189,6 +199,14 @@ export const getPackingList = asyncHandler(async (req: Request, res: Response) =
   if (!packingList) {
     throw ApiError.notFound('Packing list not found');
   }
+
+  await logAudit(
+    req,
+    'Packing List',
+    'Packing List View',
+    packingList.styleNumber || packingList.cargoNumber || packingList._id.toString(),
+    `Viewed packing list Details (Cargo: "${packingList.cargoNumber || ''}", Style: "${packingList.styleNumber || ''}").`
+  );
 
   return respond(res, StatusCodes.OK, packingList);
 });
@@ -327,6 +345,15 @@ export const updatePackingList = asyncHandler(async (req: Request, res: Response
     .populate('approvedBy', 'firstName lastName')
     .populate('toStore', 'name code');
 
+  // Log activity
+  await logAudit(
+    req,
+    'Packing List',
+    'Packing List Update',
+    packingList.styleNumber || packingList.cargoNumber || packingList._id.toString(),
+    `Updated packing list. Cargo: "${packingList.cargoNumber || ''}", Style: "${packingList.styleNumber || ''}".`
+  );
+
   return respond(res, StatusCodes.OK, updatedPackingList);
 });
 
@@ -366,6 +393,15 @@ export const approvePackingList = asyncHandler(async (req: Request, res: Respons
     .populate('store', 'name code')
     .populate('toStore', 'name code');
 
+  // Log activity
+  await logAudit(
+    req,
+    'Packing List',
+    'Packing List Approval',
+    packingList.styleNumber || packingList.cargoNumber || packingList._id.toString(),
+    `Approved packing list "${packingList.cargoNumber || ''}" (Style: "${packingList.styleNumber || ''}").`
+  );
+
   return respond(res, StatusCodes.OK, updatedPackingList, { message: 'Packing list approved successfully' });
 });
 
@@ -399,6 +435,15 @@ export const deletePackingList = asyncHandler(async (req: Request, res: Response
       }
     }
   }
+
+  // Log activity
+  await logAudit(
+    req,
+    'Packing List',
+    'Packing List Deletion',
+    packingList.styleNumber || packingList.cargoNumber || packingList._id.toString(),
+    `Deleted packing list "${packingList.cargoNumber || ''}" (Style: "${packingList.styleNumber || ''}") and restored stock.`
+  );
 
   await packingList.deleteOne();
 

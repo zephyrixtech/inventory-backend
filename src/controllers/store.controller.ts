@@ -8,6 +8,7 @@ import { Inventory } from '../models/inventory.model';
 import { ApiError } from '../utils/api-error';
 import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
+import { logAudit } from '../utils/audit-logger';
 
 export const createStore = asyncHandler(async (req: Request, res: Response) => {
   // Removed company context check since we're removing company context
@@ -58,6 +59,14 @@ export const createStore = asyncHandler(async (req: Request, res: Response) => {
     .populate('purchaser', 'firstName lastName email')
     .populate('biller', 'firstName lastName email');
 
+  await logAudit(
+    req,
+    'Store Management',
+    'Store Creation',
+    populatedStore?.code || store.code,
+    `Created store "${populatedStore?.name || store.name}" (Code: ${populatedStore?.code || store.code}).`
+  );
+
   return respond(res, StatusCodes.CREATED, populatedStore, { message: 'Store created successfully' });
 });
 
@@ -72,30 +81,72 @@ export const updateStore = asyncHandler(async (req: Request, res: Response) => {
 
   const { name, managerId, phone, email, address, city, state, postalCode, country, bankName, bankAccountNumber, ifscCode, ibanCode, taxCode, isActive } = req.body;
 
-  if (name) store.name = name;
-  if (phone !== undefined) store.phone = phone;
-  if (email !== undefined) store.email = email;
-  if (address !== undefined) store.address = address;
-  if (city !== undefined) store.city = city;
-  if (state !== undefined) store.state = state;
-  if (postalCode !== undefined) store.postalCode = postalCode;
-  if (country !== undefined) store.country = country;
-  if (bankName !== undefined) store.bankName = bankName;
-  if (bankAccountNumber !== undefined) store.bankAccountNumber = bankAccountNumber;
-  if (ifscCode !== undefined) store.ifscCode = ifscCode;
-  if (ibanCode !== undefined) store.ibanCode = ibanCode;
-  if (taxCode !== undefined) store.taxCode = taxCode;
-  if (typeof isActive === 'boolean') store.isActive = isActive;
+  const changedFields: string[] = [];
+  if (name && name !== store.name) {
+    changedFields.push(`name: "${store.name}" -> "${name}"`);
+    store.name = name;
+  }
+  if (phone !== undefined && phone !== store.phone) {
+    changedFields.push(`phone: "${store.phone || ''}" -> "${phone}"`);
+    store.phone = phone;
+  }
+  if (email !== undefined && email !== store.email) {
+    changedFields.push(`email: "${store.email || ''}" -> "${email}"`);
+    store.email = email;
+  }
+  if (address !== undefined && address !== store.address) {
+    changedFields.push(`address: updated`);
+    store.address = address;
+  }
+  if (city !== undefined && city !== store.city) {
+    changedFields.push(`city: "${store.city || ''}" -> "${city}"`);
+    store.city = city;
+  }
+  if (state !== undefined && state !== store.state) {
+    changedFields.push(`state: "${store.state || ''}" -> "${state}"`);
+    store.state = state;
+  }
+  if (postalCode !== undefined && postalCode !== store.postalCode) {
+    changedFields.push(`postalCode: "${store.postalCode || ''}" -> "${postalCode}"`);
+    store.postalCode = postalCode;
+  }
+  if (country !== undefined && country !== store.country) {
+    changedFields.push(`country: "${store.country || ''}" -> "${country}"`);
+    store.country = country;
+  }
+  if (bankName !== undefined && bankName !== store.bankName) {
+    changedFields.push(`bankName: "${store.bankName || ''}" -> "${bankName}"`);
+    store.bankName = bankName;
+  }
+  if (bankAccountNumber !== undefined && bankAccountNumber !== store.bankAccountNumber) {
+    changedFields.push(`bankAccountNumber: "${store.bankAccountNumber || ''}" -> "${bankAccountNumber}"`);
+    store.bankAccountNumber = bankAccountNumber;
+  }
+  if (ifscCode !== undefined && ifscCode !== store.ifscCode) {
+    changedFields.push(`ifscCode: "${store.ifscCode || ''}" -> "${ifscCode}"`);
+    store.ifscCode = ifscCode;
+  }
+  if (ibanCode !== undefined && ibanCode !== store.ibanCode) {
+    changedFields.push(`ibanCode: "${store.ibanCode || ''}" -> "${ibanCode}"`);
+    store.ibanCode = ibanCode;
+  }
+  if (taxCode !== undefined && taxCode !== store.taxCode) {
+    changedFields.push(`taxCode: "${store.taxCode || ''}" -> "${taxCode}"`);
+    store.taxCode = taxCode;
+  }
+  if (typeof isActive === 'boolean' && isActive !== store.isActive) {
+    changedFields.push(`isActive: ${store.isActive} -> ${isActive}`);
+    store.isActive = isActive;
+  }
 
   // Handle role-based assignment
   if (managerId !== undefined) {
     if (managerId === null || managerId === '') {
-      // Clear all role assignments
+      changedFields.push(`role assignments: cleared`);
       store.purchaser = undefined;
       store.biller = undefined;
       store.manager = undefined;
     } else {
-      // Assign the store to the selected role
       if (managerId === 'purchaser') {
         store.purchaser = 'ROLE_PURCHASER';
         store.biller = undefined;
@@ -103,8 +154,8 @@ export const updateStore = asyncHandler(async (req: Request, res: Response) => {
         store.biller = 'ROLE_BILLER';
         store.purchaser = undefined;
       }
-      // We can also set a generic manager for administrative purposes
       store.manager = 'ROLE_MANAGER';
+      changedFields.push(`assigned role: "${managerId}"`);
     }
   }
 
@@ -114,6 +165,16 @@ export const updateStore = asyncHandler(async (req: Request, res: Response) => {
     .populate('manager', 'firstName lastName email')
     .populate('purchaser', 'firstName lastName email')
     .populate('biller', 'firstName lastName email');
+
+  if (changedFields.length > 0) {
+    await logAudit(
+      req,
+      'Store Management',
+      'Store Update',
+      updatedStore?.code || store.code,
+      `Updated store "${updatedStore?.name || store.name}": ${changedFields.join(', ')}.`
+    );
+  }
 
   return respond(res, StatusCodes.OK, updatedStore, { message: 'Store updated successfully' });
 });
@@ -197,6 +258,14 @@ export const getStore = asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.notFound('Store not found');
   }
 
+  await logAudit(
+    req,
+    'Store Management',
+    'Store View',
+    store.code,
+    `Viewed details of store "${store.name}" (Code: ${store.code}).`
+  );
+
   return respond(res, StatusCodes.OK, store);
 });
 
@@ -219,6 +288,14 @@ export const deleteStore = asyncHandler(async (req: Request, res: Response) => {
   // Instead of deleting, we'll mark it as inactive
   store.isActive = false;
   await store.save();
+
+  await logAudit(
+    req,
+    'Store Management',
+    'Store Deactivation',
+    store.code,
+    `Deactivated store "${store.name}" (Code: ${store.code}).`
+  );
 
   return respond(res, StatusCodes.OK, { success: true }, { message: 'Store deactivated successfully' });
 });

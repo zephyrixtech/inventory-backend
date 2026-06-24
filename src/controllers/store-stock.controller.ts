@@ -10,6 +10,7 @@ import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
 import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
+import { logAudit } from '../utils/audit-logger';
 
 export const listStoreStock = asyncHandler(async (req: Request, res: Response) => {
 
@@ -426,6 +427,7 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
   });
 
   if (stock) {
+    const oldQty = stock.quantity;
     stock.quantity += quantity;
     stock.margin = marginPercentage;
     stock.currency = selectedCurrency;
@@ -449,6 +451,15 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
     if (storeId) stock.store = new Types.ObjectId(storeId);
     stock.lastUpdatedBy = new Types.ObjectId(req.user.id);
     await stock.save();
+
+    // Log activity
+    await logAudit(
+      req,
+      'Store Stock',
+      'Stock Adjustment',
+      stock.styleNumber || product.code,
+      `Added ${quantity} units to store stock of "${product.name}" (Code: ${product.code}). New quantity: ${stock.quantity}.`
+    );
   } else {
     stock = await StoreStock.create({
       product: product._id,
@@ -465,6 +476,15 @@ export const upsertStoreStock = asyncHandler(async (req: Request, res: Response)
       styleNumber,
       lastUpdatedBy: new Types.ObjectId(req.user.id)
     });
+
+    // Log activity
+    await logAudit(
+      req,
+      'Store Stock',
+      'Stock Adjustment',
+      stock.styleNumber || product.code,
+      `Created store stock for "${product.name}" (Code: ${product.code}) with quantity ${quantity}.`
+    );
   }
 
   // Re-fetch to populate
@@ -501,10 +521,20 @@ export const adjustStockQuantity = asyncHandler(async (req: Request, res: Respon
     throw ApiError.badRequest('Quantity is required');
   }
 
+  const oldQty = stock.quantity;
   stock.quantity = quantity;
   stock.lastUpdatedBy = new Types.ObjectId(req.user.id);
 
   await stock.save();
+
+  // Log activity
+  await logAudit(
+    req,
+    'Store Stock',
+    'Stock Adjustment',
+    stock.styleNumber || stock.product.toString(),
+    `Manually adjusted stock quantity of product from ${oldQty} to ${quantity}.`
+  );
 
   return respond(res, StatusCodes.OK, stock, { message: 'Stock quantity adjusted successfully' });
 });

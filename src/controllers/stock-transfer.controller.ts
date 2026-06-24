@@ -10,6 +10,7 @@ import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
 import { getPaginationParams } from '../utils/pagination';
 import { buildPaginationMeta } from '../utils/query-builder';
+import { logAudit } from '../utils/audit-logger';
 
 const isIndianStore = (country?: string): boolean => {
   const value = (country || '').trim().toLowerCase();
@@ -124,6 +125,15 @@ export const createStockTransfer = asyncHandler(async (req: Request, res: Respon
     .populate('requestedBy', 'firstName lastName')
     .populate('approvedBy', 'firstName lastName');
 
+  const populated = populatedTransfer as any;
+  await logAudit(
+    req,
+    'Stock Transfer',
+    'Transfer Request',
+    populated?.product?.code || transfer.product.toString(),
+    `Requested stock transfer of ${transfer.quantity} units of "${populated?.product?.name || 'Item'}" from "${populated?.fromStore?.name || 'Store'}" to "${populated?.toStore?.name || 'Store'}".`
+  );
+
   return respond(res, StatusCodes.CREATED, populatedTransfer, { message: 'Stock transfer created with pending status' });
 });
 
@@ -208,6 +218,15 @@ export const approveStockTransfer = asyncHandler(async (req: Request, res: Respo
       .populate('product', 'name code')
       .populate('requestedBy', 'firstName lastName')
       .populate('approvedBy', 'firstName lastName');
+
+    const approved = approvedTransfer as any;
+    await logAudit(
+      req,
+      'Stock Transfer',
+      'Transfer Approval',
+      approved?.product?.code || String(approvedTransferId),
+      `Approved stock transfer of ${approved?.quantity} units of "${approved?.product?.name || 'Item'}" from "${approved?.fromStore?.name || 'Store'}" to "${approved?.toStore?.name || 'Store'}".`
+    );
 
     return respond(res, StatusCodes.OK, approvedTransfer, { message: 'Stock transfer approved and stock moved successfully' });
   } finally {

@@ -8,6 +8,7 @@ import { User } from '../models/user.model';
 import { ApiError } from '../utils/api-error';
 import { asyncHandler } from '../utils/async-handler';
 import { respond } from '../utils/api-response';
+import { logAudit } from '../utils/audit-logger';
 
 export const listOpeningBalances = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {
@@ -147,6 +148,14 @@ export const getOpeningBalance = asyncHandler(async (req: Request, res: Response
   const totalExpenseAmount = totalExpenses.length > 0 ? totalExpenses[0].total : 0;
   const remainingBalance = totalOpeningBalance - totalExpenseAmount;
 
+  await logAudit(
+    req,
+    'Expense Management',
+    'Opening Balance View',
+    latestOpeningBalance._id.toString(),
+    `Viewed opening balance details. Total: ${totalOpeningBalance} AED.`
+  );
+
   return respond(res, StatusCodes.OK, {
     _id: latestOpeningBalance._id,
     amount: totalOpeningBalance,
@@ -205,6 +214,14 @@ export const createOpeningBalance = asyncHandler(async (req: Request, res: Respo
   const populatedBalance = await ExpenseOpeningBalance.findById(openingBalance._id)
     .populate('createdBy', 'firstName lastName')
     .populate('updatedBy', 'firstName lastName');
+
+  await logAudit(
+    req,
+    'Expense Management',
+    'Opening Balance Creation',
+    openingBalance._id.toString(),
+    `Created opening balance of ${openingBalance.amount} AED.`
+  );
 
   return respond(
     res,
@@ -280,6 +297,14 @@ export const updateOpeningBalance = asyncHandler(async (req: Request, res: Respo
     .populate('createdBy', 'firstName lastName')
     .populate('updatedBy', 'firstName lastName');
 
+  await logAudit(
+    req,
+    'Expense Management',
+    'Opening Balance Update',
+    openingBalance._id.toString(),
+    `Updated opening balance to ${openingBalance.amount} AED.`
+  );
+
   return respond(
     res,
     StatusCodes.OK,
@@ -324,7 +349,16 @@ export const deleteOpeningBalance = asyncHandler(async (req: Request, res: Respo
     throw ApiError.notFound('Opening balance not found or you do not have permission to delete it');
   }
 
+  const oldAmount = openingBalance.amount;
   await openingBalance.deleteOne();
+
+  await logAudit(
+    req,
+    'Expense Management',
+    'Opening Balance Deletion',
+    req.params.id,
+    `Deleted opening balance of ${oldAmount} AED.`
+  );
 
   return respond(res, StatusCodes.OK, { success: true }, { message: 'Opening balance deleted successfully' });
 });
